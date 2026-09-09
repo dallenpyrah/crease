@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+dist
+dist-site
+.crease
+.creasekit
+.env
+.env.*
+*.tgz
+coverage
+.DS_Store

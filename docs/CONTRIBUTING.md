@@ -65,6 +65,23 @@ The package build produces `dist`; the demo build produces `dist-site`. Keep con
 
 Publishing is tag-triggered and uses `NPM_TOKEN` in GitHub Actions. A tag and workflow configuration are not proof of a completed publication: verify the workflow result and the registry before announcing a release.
 
+## Deploy the web demo to Railway
+
+Connect Railway to `dallenpyrah/creasekit` on `main`, using the repository root. The checked-in `railway.json` selects the Dockerfile build and an HTTP health check at `/`. Generate a public domain in Railway after the deployment succeeds; no custom build or start command is needed.
+
+The Dockerfile installs the locked dependencies and runs `npm run build:site`. The runtime image contains Caddy and `dist-site` only. Caddy listens on all interfaces at Railway's assigned `PORT` (or port 8080 locally). Railway handles HTTPS.
+
+The public demo retains the visual feedback overlay, but the development-only FoldKit registration and MCP connection are excluded. It does not run Vite, the local MCP bridge, or the CLI. MCP sharing still requires a local consuming application with the plugin enabled.
+
+To test the same container locally:
+
+```bash
+docker build -t creasekit-site .
+docker run --rm -p 8080:8080 -e PORT=8080 creasekit-site
+```
+
+Open `http://localhost:8080`. If Railway's health check fails, remove any service-level start-command override so the container runs its configured Caddy command.
+
 ## Documentation and design
 
 Keep the README focused on installing creasekit into an existing application, not cloning the demo. Update [usage](USAGE.md), [MCP](MCP.md), and [FoldKit integration](FOLDKIT.md) documentation whenever the public behavior changes. Follow the [design guide](DESIGN.md) for visual changes.
