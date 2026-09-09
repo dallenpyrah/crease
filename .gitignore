@@ -1,0 +1,11 @@
+node_modules
+dist
+.vite
+.DS_Store
+coverage
+*.local
+.crease/
+.env
+.env.*
+*.swp
+*.swo

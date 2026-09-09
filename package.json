@@ -1,0 +1,38 @@
+{
+  "name": "crease",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt",
+    "test": "vitest run && vitest run --config server/vitest.config.ts",
+    "test:ui": "vitest run",
+    "test:server": "vitest run --config server/vitest.config.ts",
+    "mcp": "tsx server/mcp.ts",
+    "lint": "oxlint src server"
+  },
+  "dependencies": {
+    "@effect/platform-browser": "4.0.0-rc.112",
+    "@effect/platform-node": "4.0.0-rc.112",
+    "@stylexjs/stylex": "0.19.0",
+    "effect": "4.0.0-rc.112",
+    "foldkit": "0.158.2"
+  },
+  "devDependencies": {
+    "@foldkit/devtools": "0.158.2",
+    "@foldkit/oxlint-plugin": "0.12.0",
+    "@foldkit/vite-plugin": "0.20.2",
+    "@stylexjs/unplugin": "0.19.0",
+    "happy-dom": "20.11.13",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.80.0",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "4.1.11"
+  }
+}

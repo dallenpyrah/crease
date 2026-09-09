@@ -1,0 +1,50 @@
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .crease-home-shell {
+    padding-top: 96px !important;
+    padding-bottom: 64px !important;
+  }
+
+  .crease-home-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .crease-home-playground {
+    grid-template-columns: 1fr !important;
+  }
+
+  .crease-home-playground-controls {
+    justify-content: flex-start !important;
+  }
+}
