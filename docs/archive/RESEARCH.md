@@ -1,5 +1,7 @@
 # Crease — research and source audit
 
+> Historical research from before implementation. Claims about proposed work and upstream transport choices describe that investigation, not the current application. See the [contributor guide](../CONTRIBUTING.md) for the implemented boundaries and the [MCP guide](../MCP.md) to connect an agent.
+
 Research date: September 9, 2026. This document distinguishes observed implementation, documentation claims, and proposed work. It does not claim that a Crease application or integration spike has been built.
 
 ## Method

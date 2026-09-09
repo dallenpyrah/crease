@@ -1,5 +1,7 @@
 # Crease — build plan
 
+> Historical planning notes from September 9, 2026. This record includes superseded proposals, not a current feature list or release commitment. Start with the [README](../../README.md) to use Crease or the [contributor guide](../CONTRIBUTING.md) to change it.
+
 Research date: September 9, 2026. Status: a runnable local clipboard prototype is implemented. The roadmap below remains the broader release plan, not a claim of feature parity.
 
 Current implementation: FoldKit/StyleX homepage matching Mesurer's measured layout; independent Shadow DOM inspector with bounds, box model, typography, computed colors, viewport rulers, capped X-ray, Alt distances, anchored annotations, edit/delete/resolve/reopen, note undo/redo, local persistence, and Markdown/JSON export. Pointer geometry stays outside the host Model. Explicit registrations now connect targets to source files/views, static Message tags, opt-in scoped Models, and bounded observed history. Crease's own Effect v4 MCP server reads explicitly shared snapshots through a protected, loopback-only Vite bridge. See README.md for the implemented APIs and setup.
@@ -12,8 +14,8 @@ The first useful release must work without an agent connection. The differentiat
 
 Supporting documents:
 
-- [Research and source audit](docs/RESEARCH.md): verified APIs, current versions, licensing, and corrections to the initial architecture.
-- [Homepage and product design brief](docs/DESIGN.md): reference measurements, layout, copy, interactions, and visual acceptance criteria.
+- [Research and source audit](RESEARCH.md): verified APIs, current versions, licensing, and corrections to the initial architecture.
+- [Homepage and product design brief](DESIGN.md): reference measurements, layout, copy, interactions, and visual acceptance criteria.
 
 ## 1. Product decisions
 
