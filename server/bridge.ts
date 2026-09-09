@@ -16,16 +16,16 @@ import { Schema } from 'effect';
 import {
   AgentSnapshot,
   type AgentSnapshot as AgentSnapshotValue,
-} from '../src/agent-contract';
+} from '../src/agent-contract.js';
 
-export const BRIDGE_SHARE_PATH = '/__crease/share';
-export const BRIDGE_UNSHARE_PATH = '/__crease/unshare';
-export const BRIDGE_CONTEXT_PATH = '/__crease/context';
+export const BRIDGE_SHARE_PATH = '/__creasekit/share';
+export const BRIDGE_UNSHARE_PATH = '/__creasekit/unshare';
+export const BRIDGE_CONTEXT_PATH = '/__creasekit/context';
 export const MAX_REQUEST_BODY_BYTES = 128 * 1024;
 export const MAX_ANNOTATIONS = 100;
 export const MAX_SESSIONS = 20;
 export const SNAPSHOT_TTL_MS = 15 * 60 * 1000;
-export const SESSION_DIRECTORY = '.crease';
+export const SESSION_DIRECTORY = '.creasekit';
 export const SESSION_FILENAME = 'mcp-session.json';
 
 const SESSION_FILE_MAX_BYTES = 4 * 1024;
@@ -238,7 +238,7 @@ export const writeSessionFile = async (
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const directoryStat = await lstat(directory);
   if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) {
-    throw new Error('Crease session directory is not a regular directory');
+    throw new Error('creasekit session directory is not a regular directory');
   }
   await chmod(directory, 0o700);
 
@@ -314,7 +314,7 @@ export const readSessionFile = async (
     if (!fileStat.isFile() || fileStat.size > SESSION_FILE_MAX_BYTES) {
       throw new SessionReadError(
         'Invalid',
-        'Crease bridge session configuration is invalid or stale',
+        'creasekit bridge session configuration is invalid or stale',
       );
     }
     encoded = await readFile(path);
@@ -323,12 +323,12 @@ export const readSessionFile = async (
     if (isNodeError(error, 'ENOENT')) {
       throw new SessionReadError(
         'Offline',
-        'Crease bridge is offline; start the Vite development server and share context',
+        'creasekit bridge is offline; start the Vite development server and share context',
       );
     }
     throw new SessionReadError(
       'Invalid',
-      'Crease bridge session configuration could not be read',
+      'creasekit bridge session configuration could not be read',
     );
   }
 
@@ -338,7 +338,7 @@ export const readSessionFile = async (
   } catch {
     throw new SessionReadError(
       'Invalid',
-      'Crease bridge session configuration is invalid or stale',
+      'creasekit bridge session configuration is invalid or stale',
     );
   }
 
@@ -349,7 +349,7 @@ export const readSessionFile = async (
   } catch {
     throw new SessionReadError(
       'Invalid',
-      'Crease bridge session configuration is invalid or stale',
+      'creasekit bridge session configuration is invalid or stale',
     );
   }
 };

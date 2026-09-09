@@ -6,7 +6,7 @@ import {
   AnnotationArray,
   Annotation as AnnotationSchema,
   AnnotationStatus,
-} from './domain';
+} from './domain.js';
 
 export const Model = Schema.Struct({
   annotations: AnnotationArray,

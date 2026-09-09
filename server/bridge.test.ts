@@ -60,11 +60,11 @@ describe('snapshot bridge state', () => {
 
 describe('protected bridge session files', () => {
   it('writes protected credentials and removes only the owned session', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'crease-bridge-'));
+    const root = await mkdtemp(join(tmpdir(), 'creasekit-bridge-'));
     try {
       const first = createSessionDescriptor(31_001);
       const firstOwnership = await writeSessionFile(root, first);
-      const directoryMode = (await stat(join(root, '.crease'))).mode & 0o777;
+      const directoryMode = (await stat(join(root, '.creasekit'))).mode & 0o777;
       const fileMode = (await stat(sessionFilePath(root))).mode & 0o777;
       expect(directoryMode).toBe(0o700);
       expect(fileMode).toBe(0o600);

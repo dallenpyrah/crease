@@ -19,9 +19,9 @@ import {
   isLoopbackHostname,
   removeOwnedSessionFile,
   writeSessionFile,
-} from './bridge';
+} from './bridge.js';
 
-export interface CreaseBridgeOptions {
+export interface CreasekitPluginOptions {
   readonly ttlMs?: number;
 }
 
@@ -34,11 +34,11 @@ interface ValidHost {
   readonly origin: string;
 }
 
-export const creaseBridge = (options: CreaseBridgeOptions = {}): Plugin => {
+export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
   let projectRoot: string | undefined;
 
   return {
-    name: 'crease-bridge',
+    name: 'creasekit',
     apply: 'serve',
     configResolved(config) {
       assertSecureDevelopmentConfig(config);
@@ -46,11 +46,11 @@ export const creaseBridge = (options: CreaseBridgeOptions = {}): Plugin => {
     },
     configureServer(server) {
       if (projectRoot === undefined) {
-        throw new Error('Crease bridge did not receive a resolved Vite root');
+        throw new Error('creasekit bridge did not receive a resolved Vite root');
       }
       if (server.httpServer === null) {
         throw new Error(
-          'Crease bridge requires Vite to own a loopback HTTP development server',
+          'creasekit bridge requires Vite to own a loopback HTTP development server',
         );
       }
 
@@ -63,12 +63,12 @@ const assertSecureDevelopmentConfig = (config: ResolvedConfig): void => {
   const host = config.server.host;
   if (typeof host !== 'string' || !isLoopbackHostname(host)) {
     throw new Error(
-      'Crease bridge requires server.host to be 127.0.0.1, localhost, or ::1',
+      'creasekit bridge requires server.host to be 127.0.0.1, localhost, or ::1',
     );
   }
   if (config.server.https !== undefined) {
     throw new Error(
-      'Crease bridge requires the local Vite development server to use HTTP',
+      'creasekit bridge requires the local Vite development server to use HTTP',
     );
   }
 };
@@ -76,7 +76,7 @@ const assertSecureDevelopmentConfig = (config: ResolvedConfig): void => {
 const installBridge = (
   server: ViteDevServer,
   projectRoot: string,
-  options: CreaseBridgeOptions,
+  options: CreasekitPluginOptions,
 ): void => {
   const httpServer = server.httpServer;
   if (httpServer === null) return;
@@ -108,7 +108,7 @@ const installBridge = (
     const address = httpServer.address();
     if (address === null || typeof address === 'string') {
       server.config.logger.error(
-        'Crease bridge could not determine the Vite development server address',
+        'creasekit bridge could not determine the Vite development server address',
       );
       void server.close();
       return;
@@ -116,7 +116,7 @@ const installBridge = (
     const { address: boundAddress, port } = address;
     if (!isLoopbackAddress(boundAddress)) {
       server.config.logger.error(
-        'Crease bridge refused a non-loopback Vite development server address',
+        'creasekit bridge refused a non-loopback Vite development server address',
       );
       void server.close();
       return;
@@ -134,7 +134,7 @@ const installBridge = (
       })
       .catch(() => {
         server.config.logger.error(
-          'Crease bridge could not create its protected MCP session file',
+          'creasekit bridge could not create its protected MCP session file',
         );
         void server.close();
       });
@@ -278,7 +278,7 @@ const handleBridgeRequest = async (
 const parseRequestUrl = (value: string | undefined): URL | undefined => {
   if (value === undefined) return undefined;
   try {
-    return new URL(value, 'http://crease.local');
+    return new URL(value, 'http://creasekit.local');
   } catch {
     return undefined;
   }

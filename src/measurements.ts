@@ -1,4 +1,4 @@
-import type { Bounds } from './domain';
+import type { Bounds } from './domain.js';
 
 export interface Distance {
   readonly x1: number;

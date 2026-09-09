@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Annotation, isAnnotation } from './domain';
 
-describe('Crease domain', () => {
+describe('creasekit domain', () => {
   it('accepts the open annotation lifecycle', () => {
     const value = {
       version: 1,

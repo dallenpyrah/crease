@@ -15,7 +15,7 @@ describe('homepage view', () => {
     Scene.scene(
       { update, view },
       Scene.given(model()),
-      Scene.expect(Scene.role('img', { name: 'Crease' })).toHaveAttr('src'),
+      Scene.expect(Scene.role('img', { name: 'creasekit' })).toHaveAttr('src'),
       Scene.expect(
         Scene.role('heading', {
           name: 'Inspect, annotate, and give feedback on any FoldKit interface',

@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
 
-import { FoldkitContext } from './foldkit-schema';
+import { FoldkitContext } from './foldkit-schema.js';
 
 export const Bounds = Schema.Struct({
   x: Schema.Number,

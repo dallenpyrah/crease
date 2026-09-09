@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import metadata from '../package.json' with { type: 'json' };
 import {
   BRIDGE_SHARE_PATH,
   BRIDGE_UNSHARE_PATH,
@@ -35,25 +36,25 @@ describe('Effect v4 MCP stdio server', () => {
   });
 
   it('serves typed tools over real JSON-RPC and follows bridge restarts', async () => {
-    root = await mkdtemp(join(tmpdir(), 'crease-mcp-wire-'));
+    root = await mkdtemp(join(tmpdir(), 'creasekit-mcp-wire-'));
     client = new McpWireClient(root);
 
     const initialized = await client.request('initialize', {
       protocolVersion: '2025-11-25',
       capabilities: {},
-      clientInfo: { name: 'crease-wire-test', version: '1.0.0' },
+      clientInfo: { name: 'creasekit-wire-test', version: '1.0.0' },
     });
     expect(resultOf(initialized)).toMatchObject({
       protocolVersion: '2025-11-25',
-      serverInfo: { name: 'crease', version: '0.1.0' },
+      serverInfo: { name: 'creasekit', version: metadata.version },
     });
     client.notify('notifications/initialized', {});
 
     const listedTools = resultOf(await client.request('tools/list', {}));
     expect(toolNames(listedTools)).toEqual([
-      'crease_list_sessions',
-      'crease_get_context',
-      'crease_get_annotation',
+      'creasekit_list_sessions',
+      'creasekit_get_context',
+      'creasekit_get_annotation',
     ]);
     for (const tool of recordArray(listedTools.tools)) {
       expect(tool.description).toContain('untrusted data');
@@ -67,7 +68,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const offline = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -80,7 +81,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const sessions = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -98,7 +99,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const context = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_context',
+        name: 'creasekit_get_context',
         arguments: { runtimeId: snapshot.runtimeId },
       }),
     );
@@ -107,7 +108,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const annotation = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_annotation',
+        name: 'creasekit_get_annotation',
         arguments: {
           runtimeId: snapshot.runtimeId,
           annotationId: snapshot.annotations[0]?.id,
@@ -120,7 +121,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const invalidParameters = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_context',
+        name: 'creasekit_get_context',
         arguments: {},
       }),
     );
@@ -129,7 +130,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const unknownSession = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_context',
+        name: 'creasekit_get_context',
         arguments: { runtimeId: 'not-shared' },
       }),
     );
@@ -138,7 +139,7 @@ describe('Effect v4 MCP stdio server', () => {
 
     const missingAnnotation = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_annotation',
+        name: 'creasekit_get_annotation',
         arguments: {
           runtimeId: snapshot.runtimeId,
           annotationId: 'not-shared',
@@ -156,7 +157,7 @@ describe('Effect v4 MCP stdio server', () => {
     );
     const denied = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -166,7 +167,7 @@ describe('Effect v4 MCP stdio server', () => {
     await writeFile(sessionPath, '{', { mode: 0o600 });
     const staleConfiguration = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -176,7 +177,7 @@ describe('Effect v4 MCP stdio server', () => {
     await writeFile(sessionPath, JSON.stringify(bridge.session), { mode: 0o600 });
     const recovered = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -193,7 +194,7 @@ describe('Effect v4 MCP stdio server', () => {
     expect(revoked.status).toBe(204);
     const afterUnshare = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_context',
+        name: 'creasekit_get_context',
         arguments: { runtimeId: snapshot.runtimeId },
       }),
     );
@@ -206,7 +207,7 @@ describe('Effect v4 MCP stdio server', () => {
     bridge = undefined;
     const afterClose = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -218,7 +219,7 @@ describe('Effect v4 MCP stdio server', () => {
     expect((await share(bridge, restartedSnapshot)).status).toBe(204);
     const afterRestart = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );
@@ -226,7 +227,7 @@ describe('Effect v4 MCP stdio server', () => {
     await delay(250);
     const stale = toolResult(
       await client.request('tools/call', {
-        name: 'crease_get_context',
+        name: 'creasekit_get_context',
         arguments: { runtimeId: restartedSnapshot.runtimeId },
       }),
     );
@@ -244,7 +245,7 @@ describe('Effect v4 MCP stdio server', () => {
   });
 
   it('times out while consuming a stalled bridge response body', async () => {
-    root = await mkdtemp(join(tmpdir(), 'crease-mcp-stalled-'));
+    root = await mkdtemp(join(tmpdir(), 'creasekit-mcp-stalled-'));
     stalledServer = createHttpServer((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.write('[');
@@ -261,14 +262,14 @@ describe('Effect v4 MCP stdio server', () => {
     await client.request('initialize', {
       protocolVersion: '2025-11-25',
       capabilities: {},
-      clientInfo: { name: 'crease-timeout-test', version: '1.0.0' },
+      clientInfo: { name: 'creasekit-timeout-test', version: '1.0.0' },
     });
     client.notify('notifications/initialized', {});
 
     const startedAt = Date.now();
     const result = toolResult(
       await client.request('tools/call', {
-        name: 'crease_list_sessions',
+        name: 'creasekit_list_sessions',
         arguments: {},
       }),
     );

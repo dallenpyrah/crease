@@ -5,7 +5,8 @@ import { Document, HtmlBuilder } from 'foldkit/html';
 import { defineMessageUnion } from 'foldkit/message';
 import { evo } from 'foldkit/struct';
 
-import creaseLogo from './assets/crease.svg';
+import metadata from '../package.json' with { type: 'json' };
+import creasekitLogo from './assets/creasekit.svg';
 import { styles } from './styles';
 
 type FeatureIcon =
@@ -298,28 +299,28 @@ const featureRow = (h: HtmlBuilder<Message>, feature: Feature) =>
   );
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
-  title: 'Crease — visual feedback for FoldKit',
+  title: 'creasekit — visual feedback for FoldKit',
   body: h.div(
-    [classAttr(h, css(styles.page), 'crease-home-page')],
+    [classAttr(h, css(styles.page), 'creasekit-home-page')],
     [
       h.main(
-        [classAttr(h, css(styles.shell), 'crease-home-shell')],
+        [classAttr(h, css(styles.shell), 'creasekit-home-shell')],
         [
           h.header(
             [],
             [
               h.img([
                 classAttr(h, css(styles.brandMark)),
-                h.Src(creaseLogo),
-                h.Alt('Crease'),
+                h.Src(creasekitLogo),
+                h.Alt('creasekit'),
                 h.Width('36'),
                 h.Height('36'),
               ]),
               h.p(
                 [classAttr(h, css(styles.brandLine))],
                 [
-                  h.span([], ['Crease']),
-                  h.span([classAttr(h, css(styles.version))], ['v0.1.0']),
+                  h.span([], ['creasekit']),
+                  h.span([classAttr(h, css(styles.version))], [`v${metadata.version}`]),
                 ],
               ),
               h.h1(
@@ -329,7 +330,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
               h.p(
                 [classAttr(h, css(styles.introText))],
                 [
-                  'Crease runs directly where you build. Share feedback with your agents and your team.',
+                  'creasekit runs directly where you build. Share feedback with your agents and your team.',
                 ],
               ),
             ],
@@ -349,7 +350,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
             [
               h.h2([classAttr(h, css(styles.sectionTitle))], ['How to use']),
               h.div(
-                [classAttr(h, css(styles.howCards), 'crease-home-cards')],
+                [classAttr(h, css(styles.howCards), 'creasekit-home-cards')],
                 [
                   h.article(
                     [classAttr(h, css(styles.howCard))],
@@ -385,7 +386,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                           h.code(
                             [],
                             [
-                              "import { mountCrease } from './crease'\nmountCrease({ projectId: 'my-app' })",
+                              "import { mountCreasekit } from 'creasekit'\nmountCreasekit({ projectId: 'my-app' })",
                             ],
                           ),
                         ],
@@ -403,17 +404,17 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
               h.p(
                 [classAttr(h, css(styles.playgroundLead))],
                 [
-                  'Toggle Crease off to try the counter. Turn it back on to inspect or annotate this live FoldKit view.',
+                  'Toggle creasekit off to try the counter. Turn it back on to inspect or annotate this live FoldKit view.',
                 ],
               ),
               h.div(
                 [
-                  classAttr(h, css(styles.playground), 'crease-home-playground'),
-                  h.DataAttribute('crease-target', 'playground'),
+                  classAttr(h, css(styles.playground), 'creasekit-home-playground'),
+                  h.DataAttribute('creasekit-target', 'playground'),
                 ],
                 [
                   h.div(
-                    [h.DataAttribute('crease-target', 'playground-counter')],
+                    [h.DataAttribute('creasekit-target', 'playground-counter')],
                     [
                       h.p(
                         [classAttr(h, css(styles.playgroundLabel))],
@@ -422,7 +423,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.output(
                         [
                           classAttr(h, css(styles.playgroundValue)),
-                          h.DataAttribute('crease-target', 'playground-value'),
+                          h.DataAttribute('creasekit-target', 'playground-value'),
                           h.AriaLabel('Counter value'),
                           h.AriaLive('polite'),
                         ],
@@ -435,7 +436,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       classAttr(
                         h,
                         css(styles.playgroundControls),
-                        'crease-home-playground-controls',
+                        'creasekit-home-playground-controls',
                       ),
                     ],
                     [
@@ -449,7 +450,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                             ),
                           ),
                           h.Type('button'),
-                          h.DataAttribute('crease-target', 'playground-decrement'),
+                          h.DataAttribute('creasekit-target', 'playground-decrement'),
                           h.AriaLabel('Decrease counter'),
                           h.OnClick(Message.ClickedDecrement()),
                         ],
@@ -459,7 +460,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                         [
                           classAttr(h, css(styles.playgroundButton)),
                           h.Type('button'),
-                          h.DataAttribute('crease-target', 'playground-increment'),
+                          h.DataAttribute('creasekit-target', 'playground-increment'),
                           h.AriaLabel('Increase counter'),
                           h.OnClick(Message.ClickedIncrement()),
                         ],
@@ -475,7 +476,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                             ),
                           ),
                           h.Type('button'),
-                          h.DataAttribute('crease-target', 'playground-reset'),
+                          h.DataAttribute('creasekit-target', 'playground-reset'),
                           h.OnClick(Message.ClickedReset()),
                         ],
                         ['Reset'],

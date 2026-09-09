@@ -1,57 +1,108 @@
-<img src="./src/assets/crease.svg" width="48" height="48" alt="Crease" />
+<img src="https://raw.githubusercontent.com/dallenpyrah/creasekit/main/src/assets/creasekit.svg" width="48" height="48" alt="creasekit" />
 
-# Crease
+# creasekit
 
-Visual feedback for FoldKit. Inspect elements, leave notes, and share context with your coding agent through MCP or copied Markdown and JSON.
+Visual feedback and read-only MCP context for FoldKit applications. Mount the overlay in your existing Vite app to inspect elements, leave notes, and share an intentional snapshot with a coding agent.
 
-Crease helps you show an agent exactly which part of an interface needs to change. You can inspect layout, spacing, typography, and colors; attach notes to elements; and review the context before sharing it. Registered controls can also include source locations, event Messages, and application state you choose to expose.
+> **First release pending:** `creasekit` is not yet published to npm, and its license is still being finalized. The commands below describe the consumer setup for the first release.
 
-Crease currently runs from this checkout as a local development prototype. There is no published npm package or browser extension.
+## Add creasekit to an existing app
 
-## Try it locally
+Use an existing FoldKit application with Vite. creasekit requires Node.js 22.12 or later. From the **consuming application's root**—not this repository or a package directory—install it as a development dependency:
 
-Use Node 26 and npm. If you use nvm, run `nvm use` from the repository root to select the version in `.nvmrc`.
-
-From your checkout, run:
-
-```sh
-npm ci
-npm run dev
+```bash
+bun add -D creasekit
 ```
 
-Open `http://127.0.0.1:4173`. You should see the homepage, a floating toolbar, and a counter playground. Keep the server running while you use Crease or its MCP connection. It accepts local connections only.
+```bash
+npm install -D creasekit
+```
 
-## Leave your first note
+Add creasekit's local session directory to that application's `.gitignore` before starting the dev server:
 
-1. The toolbar starts in inspection mode. Click the Crease icon to turn it off, then try the counter's **+**, **−**, and **Reset** controls.
-2. Turn Crease back on and click a control to inspect it. Use `Alt+Shift+C` as a shortcut for the toggle.
-3. Choose **Add a note**, describe the change you want, and choose **Add note** or press `Cmd/Ctrl+Enter` to save it.
-4. Open **Feedback**. Review your notes in **Markdown** or **JSON**, then choose **Copy for agent** and paste the output into your coding agent or a message to a teammate.
+```gitignore
+.creasekit/
+```
 
-See [Inspect an interface and leave feedback](docs/USAGE.md) for measuring spacing, inspecting typography and colors, editing notes, and keyboard shortcuts.
+### Add the Vite plugin
 
-## Connect your coding agent
+This is the complete minimum Vite configuration used by the packaged consumer fixture:
 
-Crease's MCP server lets your agent read a snapshot of your selected element and notes. Nothing is available until you choose **Share snapshot** in Feedback. Share again to refresh the snapshot, or choose **Stop sharing** to prevent further reads.
+```ts
+import { foldkit } from '@foldkit/vite-plugin';
+import { creasekit } from 'creasekit/vite';
+import { defineConfig } from 'vite';
 
-Follow [Connect a coding agent](docs/MCP.md) for the client configuration, available tools, and troubleshooting. You can keep using copied feedback without connecting an agent.
+export default defineConfig({
+  plugins: [foldkit(), creasekit()],
+  server: { host: '127.0.0.1' },
+});
+```
 
-## Know what you are sharing
+In an existing config, append `creasekit()` to the existing plugin list and preserve every other plugin and server option. The plugin requires an explicit `server.host: '127.0.0.1'` and Vite's local HTTP server. Do not expose the server on a network interface, use a tunnel, or enable HTTPS: MCP sharing is intentionally loopback-only.
 
-Notes stay in your browser until you copy or share them. Application state and update history are opt-in and include only developer-registered fields; Crease never saves those values in annotation storage.
+The plugin writes its local session file under Vite's configured `root`, which defaults to the application root. If the config sets `root` to a subdirectory, that directory contains `.creasekit/mcp-session.json` and is the directory to use for `--cwd`.
 
-Shared snapshots expire after 15 minutes and disappear when the development server restarts. Agents have read-only access through Crease. Stopping sharing does not erase information an agent has already read.
+### Mount the development overlay
 
-Review context before sharing it, especially on pages containing private information. See [sharing and privacy](docs/MCP.md#sharing-and-privacy) for the safeguards and their limits.
+In the application entry module, append only this block **after the existing** `Runtime.run(application)` call. Do not repeat that call. Replace `'my-app'` with a stable project ID for the application.
 
-## Current limits
+```ts
+if (import.meta.env.DEV) {
+  const { createAgentConnection, mountCreasekit } = await import('creasekit');
+  const creasekit = mountCreasekit({
+    projectId: 'my-app',
+    agent: createAgentConnection(),
+  });
 
-- Source and application-state context require explicit registrations. The demo registers its counter; Crease does not automatically discover source ownership or trace which element caused a Command.
-- Agent sharing works only with the local development server. It is not available through remote tunnels or production previews.
-- Crease does not yet offer drawing tools, screenshot capture, cloud or team synchronization, or agent-driven changes to annotations.
+  if (import.meta.hot) {
+    import.meta.hot.dispose(() => creasekit.destroy());
+  }
+}
+```
 
-## Work on Crease
+The dynamic import keeps the overlay in development wiring. creasekit includes its own SVG layer and styles, so do not add a CSS import. Start your application as usual and open its own Vite URL. Click the creasekit icon or press `Alt+Shift+C` to open the toolbar; it starts collapsed so normal page interaction still works. The address `http://127.0.0.1:4173` is only this repository's demo address.
 
-Use the [contributor guide](docs/CONTRIBUTING.md) to find the relevant code, register FoldKit context, and run checks. Follow the [design guide](docs/DESIGN.md) for interface conventions.
+## Share context with an MCP client
 
-The Crease mark and implementation are original; the visual design takes inspiration from [Mesurer](https://mesurer.dev/). Inter ships with its [font license](public/fonts/LICENSE-Inter.txt).
+Open the overlay's **Feedback** panel, review the selection and notes, then choose **Share snapshot**. Configure an MCP client to start the stdio server from the consuming application's configured Vite root:
+
+```json
+{
+  "mcpServers": {
+    "creasekit": {
+      "command": "bun",
+      "args": ["x", "creasekit", "--cwd", "/absolute/path/to/foldkit-app"]
+    }
+  }
+}
+```
+
+The `--cwd` directory must be Vite's configured root, which contains `.creasekit/mcp-session.json`, not the creasekit repository or `node_modules`. Use either launcher when testing the binary yourself:
+
+```bash
+bunx creasekit --help
+npx --yes creasekit --help
+```
+
+The binary starts a stdio MCP server and supports `--cwd <project-root>` and `--help`. Bun follows the binary's Node shebang, so Node.js 22.12 or later is still required. See the complete [MCP setup, tools, and troubleshooting guide](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md).
+
+## Add optional FoldKit context
+
+The overlay works without application registration. To show a selected element's source location, event Message metadata, a narrow Model projection, and observed updates, import `createFoldkitInspector` from `creasekit`, register the scopes you want to expose, wrap the existing `update` and `view`, and pass the inspector to `mountCreasekit`.
+
+creasekit does not discover source ownership or arbitrary Model values from the DOM. [Register FoldKit context explicitly](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md) when that information is useful.
+
+## What an agent can read
+
+Notes remain in the browser until you copy or explicitly share them. MCP exposes only a captured, read-only snapshot that you chose to share; it expires after 15 minutes and disappears when the Vite dev server stops. Stopping sharing cannot erase information an agent has already read.
+
+Model values and update history are opt-in and limited to developer-registered projections. Review all captured text before sharing it, especially on pages with private information. [Usage and privacy details](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md) and the [MCP sharing limits](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md#sharing-and-privacy) explain the boundary.
+
+## Documentation
+
+- [Use the overlay](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md)
+- [Connect an MCP client](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md)
+- [Register FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md)
+- [Contribute to creasekit](https://github.com/dallenpyrah/creasekit/blob/main/docs/CONTRIBUTING.md)
+- [Design guide](https://github.com/dallenpyrah/creasekit/blob/main/docs/DESIGN.md)

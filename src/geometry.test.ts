@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { selectorFor, snapshotElement } from './geometry';
 
-describe('Crease DOM context', () => {
+describe('creasekit DOM context', () => {
   it('creates a stable selector anchored at the nearest unique id', () => {
     document.body.innerHTML = `
       <main id="workspace">
@@ -32,5 +32,17 @@ describe('Crease DOM context', () => {
     expect(target.role).toBe('button');
     expect(target.text).toBe('Deploy');
     expect(target.selector).toBe('#deploy');
+  });
+
+  it('honors both current and pre-rename private-region markers', () => {
+    for (const attribute of ['data-creasekit-private', 'data-crease-private']) {
+      document.body.innerHTML = `<main><span>Public label</span><section ${attribute}><span>Private value</span></section></main>`;
+      const parent = document.querySelector('main');
+      const privateChild = document.querySelector('section span');
+      if (parent === null || privateChild === null)
+        throw new Error('Missing privacy fixture');
+      expect(snapshotElement(parent).text).toBe('Public label');
+      expect(snapshotElement(privateChild).text).toBe('[redacted]');
+    }
   });
 });

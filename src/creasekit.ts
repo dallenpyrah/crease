@@ -1,25 +1,25 @@
 import { Clock, Effect } from 'effect';
 
-import type { AgentConnection, AgentSnapshot } from './agent-contract';
-import { type Annotation, makeAnnotation, redactedPageUrl } from './domain';
-import { formatJson, formatMarkdown } from './export';
-import * as Feedback from './feedback';
-import { type FoldkitInspector, withoutModel } from './foldkit-context';
+import type { AgentConnection, AgentSnapshot } from './agent-contract.js';
+import { type Annotation, makeAnnotation, redactedPageUrl } from './domain.js';
+import { formatJson, formatMarkdown } from './export.js';
+import * as Feedback from './feedback.js';
+import { type FoldkitInspector, withoutModel } from './foldkit-context.js';
 import {
   isInspectable,
   selectorFor,
   snapshotElement,
   spacingToNearestSibling,
-} from './geometry';
-import { type IconName, icon } from './icons';
-import { distanceMarkup, distancesBetween, rulerMarkup } from './measurements';
-import { overlayStyles } from './overlay-styles';
-import { makeLocalPersistence } from './persistence';
+} from './geometry.js';
+import { type IconName, icon } from './icons.js';
+import { distanceMarkup, distancesBetween, rulerMarkup } from './measurements.js';
+import { overlayStyles } from './overlay-styles.js';
+import { makeLocalPersistence } from './persistence.js';
 
 type Mode = 'inspect' | 'annotate' | 'typography' | 'color';
 type OutputFormat = 'notes' | 'markdown' | 'json';
 
-export interface CreaseOptions {
+export interface CreasekitOptions {
   readonly target?: HTMLElement;
   readonly projectId?: string;
   readonly startOpen?: boolean;
@@ -27,7 +27,7 @@ export interface CreaseOptions {
   readonly agent?: AgentConnection;
 }
 
-export interface CreaseHandle {
+export interface CreasekitHandle {
   readonly destroy: () => void;
   readonly open: () => void;
   readonly close: () => void;
@@ -61,7 +61,7 @@ interface State {
 const get = <T extends Element>(root: ShadowRoot, selector: string): T => {
   const element = root.querySelector<T>(selector);
   if (element === null)
-    throw new Error(`Crease overlay element not found: ${selector}`);
+    throw new Error(`creasekit overlay element not found: ${selector}`);
   return element;
 };
 
@@ -70,100 +70,100 @@ const number = (value: number): string => `${Math.round(value * 10) / 10}`;
 const tool = (action: string, name: IconName, label: string): string =>
   `<button type="button" data-action="${action}" aria-label="${label}" data-tip="${label}">${icon(name)}</button>`;
 const actionButton = (action: string, name: IconName, label: string): string =>
-  `<button type="button" class="crease-action" data-action="${action}">${icon(name)}${label}</button>`;
+  `<button type="button" class="creasekit-action" data-action="${action}">${icon(name)}${label}</button>`;
 
-export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
+export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle => {
   const host = document.createElement('div');
-  host.setAttribute('data-crease-root', '');
-  host.setAttribute('aria-label', 'Crease visual feedback tools');
+  host.setAttribute('data-creasekit-root', '');
+  host.setAttribute('aria-label', 'creasekit visual feedback tools');
   (options.target ?? document.body).appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>${overlayStyles}</style>
-    <div class="crease-layer">
-      <div class="crease-visual" aria-hidden="true">
-        <svg class="crease-svg" xmlns="http://www.w3.org/2000/svg">
-          <g class="crease-xray"></g>
-          <rect class="crease-rect is-hover" hidden/>
-          <rect class="crease-rect is-selected" hidden/>
-          <g class="crease-selection-handles"></g>
-          <g class="crease-distances"></g>
-          <g class="crease-rulers"></g>
+    <div class="creasekit-layer">
+      <div class="creasekit-visual" aria-hidden="true">
+        <svg class="creasekit-svg" xmlns="http://www.w3.org/2000/svg">
+          <g class="creasekit-xray"></g>
+          <rect class="creasekit-rect is-hover" hidden/>
+          <rect class="creasekit-rect is-selected" hidden/>
+          <g class="creasekit-selection-handles"></g>
+          <g class="creasekit-distances"></g>
+          <g class="creasekit-rulers"></g>
         </svg>
-        <div class="crease-hover-label" hidden></div>
-        <div class="crease-size-label" hidden></div>
+        <div class="creasekit-hover-label" hidden></div>
+        <div class="creasekit-size-label" hidden></div>
       </div>
-      <div class="crease-pins"></div>
-      <div class="crease-limit" hidden>Showing up to 500 visible elements</div>
-      <section class="crease-panel crease-card" hidden aria-label="Element inspector">
-        <div class="crease-card-head">
-          <span class="crease-tag"></span><h2 class="crease-card-title"></h2>
-          <button class="crease-close" data-action="close-card" aria-label="Close inspector">${icon('close')}</button>
+      <div class="creasekit-pins"></div>
+      <div class="creasekit-limit" hidden>Showing up to 500 visible elements</div>
+      <section class="creasekit-panel creasekit-card" hidden aria-label="Element inspector">
+        <div class="creasekit-card-head">
+          <span class="creasekit-tag"></span><h2 class="creasekit-card-title"></h2>
+          <button class="creasekit-close" data-action="close-card" aria-label="Close inspector">${icon('close')}</button>
         </div>
-        <div class="crease-details"></div>
-        <section class="crease-foldkit" hidden aria-label="FoldKit context"></section>
-        <div class="crease-composer" hidden>
+        <div class="creasekit-details"></div>
+        <section class="creasekit-foldkit" hidden aria-label="FoldKit context"></section>
+        <div class="creasekit-composer" hidden>
           <textarea aria-label="Feedback" placeholder="What should change about this element?" maxlength="4000"></textarea>
-          <div class="crease-actions"><span class="crease-card-hint">⌘ ↵ to save</span>
-            <button class="crease-action" data-action="cancel-composer">Cancel</button>
-            <button class="crease-action is-primary" data-action="add">Add note</button>
+          <div class="creasekit-actions"><span class="creasekit-card-hint">⌘ ↵ to save</span>
+            <button class="creasekit-action" data-action="cancel-composer">Cancel</button>
+            <button class="creasekit-action is-primary" data-action="add">Add note</button>
           </div>
         </div>
-        <div class="crease-actions crease-card-actions">
+        <div class="creasekit-actions creasekit-card-actions">
           ${actionButton('copy-selected', 'copy', 'Copy element')}
           ${actionButton('compose', 'note', 'Add a note')}
         </div>
       </section>
-      <section class="crease-panel crease-output" hidden aria-label="Agent context">
-        <div class="crease-output-head">
-          <div><h2 class="crease-output-title">Feedback</h2><p class="crease-subtitle">Local notes. You choose what to share.</p></div>
-          <button class="crease-close" data-action="close-output" aria-label="Close feedback">${icon('close')}</button>
+      <section class="creasekit-panel creasekit-output" hidden aria-label="Agent context">
+        <div class="creasekit-output-head">
+          <div><h2 class="creasekit-output-title">Feedback</h2><p class="creasekit-subtitle">Local notes. You choose what to share.</p></div>
+          <button class="creasekit-close" data-action="close-output" aria-label="Close feedback">${icon('close')}</button>
         </div>
-        <div class="crease-tabs" role="tablist" aria-label="Feedback format">
-          <button role="tab" data-output-format="notes" aria-controls="crease-notes">Notes</button>
-          <button role="tab" data-output-format="markdown" aria-controls="crease-export">Markdown</button>
-          <button role="tab" data-output-format="json" aria-controls="crease-export">JSON</button>
+        <div class="creasekit-tabs" role="tablist" aria-label="Feedback format">
+          <button role="tab" data-output-format="notes" aria-controls="creasekit-notes">Notes</button>
+          <button role="tab" data-output-format="markdown" aria-controls="creasekit-export">Markdown</button>
+          <button role="tab" data-output-format="json" aria-controls="creasekit-export">JSON</button>
         </div>
-        <div class="crease-list" id="crease-notes" role="tabpanel" aria-label="Notes"></div>
-        <pre class="crease-output-code" id="crease-export" role="tabpanel" aria-label="Export preview" tabindex="0" hidden></pre>
-        <div class="crease-storage-warning" role="status" hidden>Storage unavailable. Notes are in memory only; copy them before closing.</div>
-        <div class="crease-agent" hidden>
-          <div><strong>Crease MCP</strong><p class="crease-agent-status">Share a read-only snapshot with your local agent.</p></div>
-          <div class="crease-actions">${actionButton('unshare', 'close', 'Stop sharing')}${actionButton('share', 'output', 'Share snapshot')}</div>
+        <div class="creasekit-list" id="creasekit-notes" role="tabpanel" aria-label="Notes"></div>
+        <pre class="creasekit-output-code" id="creasekit-export" role="tabpanel" aria-label="Export preview" tabindex="0" hidden></pre>
+        <div class="creasekit-storage-warning" role="status" hidden>Storage unavailable. Notes are in memory only; copy them before closing.</div>
+        <div class="creasekit-agent" hidden>
+          <div><strong>creasekit MCP</strong><p class="creasekit-agent-status">Share a read-only snapshot with your local agent.</p></div>
+          <div class="creasekit-actions">${actionButton('unshare', 'close', 'Stop sharing')}${actionButton('share', 'output', 'Share snapshot')}</div>
         </div>
-        <div class="crease-output-footer">
-          <div class="crease-output-actions">
-            <button class="crease-close" data-action="undo" aria-label="Undo annotation change" title="Undo (⌘ Z)">${icon('undo')}</button>
-            <button class="crease-close" data-action="redo" aria-label="Redo annotation change" title="Redo (⌘ ⇧ Z)">${icon('redo')}</button>
+        <div class="creasekit-output-footer">
+          <div class="creasekit-output-actions">
+            <button class="creasekit-close" data-action="undo" aria-label="Undo annotation change" title="Undo (⌘ Z)">${icon('undo')}</button>
+            <button class="creasekit-close" data-action="redo" aria-label="Redo annotation change" title="Redo (⌘ ⇧ Z)">${icon('redo')}</button>
           </div>
           ${actionButton('copy-output', 'copy', 'Copy for agent')}
         </div>
       </section>
-      <section class="crease-panel crease-settings" hidden aria-label="Crease settings">
-        <div class="crease-settings-head"><strong class="crease-output-title">Settings</strong><button class="crease-close" data-action="close-settings" aria-label="Close settings">${icon('close')}</button></div>
-        <div class="crease-settings-body">
-          <label class="crease-setting">Show annotation pins<input type="checkbox" data-setting="pins" checked></label>
-          <label class="crease-setting">Viewport rulers<input type="checkbox" data-setting="rulers"></label>
-          <label class="crease-setting crease-model-setting" hidden>Include scoped Model & history<input type="checkbox" data-setting="model"></label>
-          <p class="crease-subtitle crease-model-setting" hidden>Only developer-registered fields are included. Model values stay out of local storage.</p>
-          <p class="crease-subtitle">Notes persist locally. Visual settings apply to this session.</p>
-          <div class="crease-shortcuts"><span>Toggle Crease</span><kbd>⌥ ⇧ C</kbd><span>Inspect / annotate</span><span><kbd>I</kbd> <kbd>N</kbd></span><span>Typography / color</span><span><kbd>A</kbd> <kbd>P</kbd></span><span>X-ray / rulers</span><span><kbd>X</kbd> <kbd>R</kbd></span><span>Distance to selected element</span><kbd>hold ⌥</kbd><span>Undo / redo note change</span><span><kbd>⌘ Z</kbd> <kbd>⌘ ⇧ Z</kbd></span><span>Dismiss / exit</span><kbd>esc</kbd></div>
+      <section class="creasekit-panel creasekit-settings" hidden aria-label="creasekit settings">
+        <div class="creasekit-settings-head"><strong class="creasekit-output-title">Settings</strong><button class="creasekit-close" data-action="close-settings" aria-label="Close settings">${icon('close')}</button></div>
+        <div class="creasekit-settings-body">
+          <label class="creasekit-setting">Show annotation pins<input type="checkbox" data-setting="pins" checked></label>
+          <label class="creasekit-setting">Viewport rulers<input type="checkbox" data-setting="rulers"></label>
+          <label class="creasekit-setting creasekit-model-setting" hidden>Include scoped Model & history<input type="checkbox" data-setting="model"></label>
+          <p class="creasekit-subtitle creasekit-model-setting" hidden>Only developer-registered fields are included. Model values stay out of local storage.</p>
+          <p class="creasekit-subtitle">Notes persist locally. Visual settings apply to this session.</p>
+          <div class="creasekit-shortcuts"><span>Toggle creasekit</span><kbd>⌥ ⇧ C</kbd><span>Inspect / annotate</span><span><kbd>I</kbd> <kbd>N</kbd></span><span>Typography / color</span><span><kbd>A</kbd> <kbd>P</kbd></span><span>X-ray / rulers</span><span><kbd>X</kbd> <kbd>R</kbd></span><span>Distance to selected element</span><kbd>hold ⌥</kbd><span>Undo / redo note change</span><span><kbd>⌘ Z</kbd> <kbd>⌘ ⇧ Z</kbd></span><span>Dismiss / exit</span><kbd>esc</kbd></div>
         </div>
       </section>
-      <div class="crease-toolbar" role="toolbar" aria-label="Crease tools">
-        <button class="crease-launcher" data-action="toggle-open" aria-label="Toggle Crease" data-tip="Toggle Crease · ⌥ ⇧ C">${icon('crease')}</button>
-        <div class="crease-toolrow">
-          ${tool('annotate', 'note', 'Annotate (N)')}<span class="crease-divider"></span>
+      <div class="creasekit-toolbar" role="toolbar" aria-label="creasekit tools">
+        <button class="creasekit-launcher" data-action="toggle-open" aria-label="Toggle creasekit" data-tip="Toggle creasekit · ⌥ ⇧ C">${icon('creasekit')}</button>
+        <div class="creasekit-toolrow">
+          ${tool('annotate', 'note', 'Annotate (N)')}<span class="creasekit-divider"></span>
           ${tool('inspect', 'inspect', 'Inspect (I)')}
           ${tool('xray', 'xray', 'X-ray (X)')}
           ${tool('rulers', 'ruler', 'Rulers (R)')}
           ${tool('typography', 'type', 'Typography (A)')}
-          ${tool('color', 'color', 'Sample color (P)')}<span class="crease-divider"></span>
-          <button data-action="open-output" aria-label="Open feedback" data-tip="Feedback & agent context">${icon('output')}<span class="crease-count" hidden></span></button>
+          ${tool('color', 'color', 'Sample color (P)')}<span class="creasekit-divider"></span>
+          <button data-action="open-output" aria-label="Open feedback" data-tip="Feedback & agent context">${icon('output')}<span class="creasekit-count" hidden></span></button>
           ${tool('settings', 'settings', 'Settings')}
         </div>
       </div>
-      <div class="crease-toast" role="status" aria-live="polite" hidden></div>
+      <div class="creasekit-toast" role="status" aria-live="polite" hidden></div>
     </div>`;
 
   const persistence = makeLocalPersistence(options.projectId ?? 'default');
@@ -191,20 +191,20 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     copyFallback: null,
   };
   const runtimeId = Effect.runSync(Effect.sync(() => crypto.randomUUID()));
-  const card = get<HTMLElement>(shadow, '.crease-card');
-  const details = get<HTMLElement>(shadow, '.crease-details');
-  const composer = get<HTMLElement>(shadow, '.crease-composer');
+  const card = get<HTMLElement>(shadow, '.creasekit-card');
+  const details = get<HTMLElement>(shadow, '.creasekit-details');
+  const composer = get<HTMLElement>(shadow, '.creasekit-composer');
   const textarea = get<HTMLTextAreaElement>(shadow, 'textarea');
-  const list = get<HTMLElement>(shadow, '.crease-list');
-  const output = get<HTMLElement>(shadow, '.crease-output');
-  const outputCode = get<HTMLElement>(shadow, '.crease-output-code');
+  const list = get<HTMLElement>(shadow, '.creasekit-list');
+  const output = get<HTMLElement>(shadow, '.creasekit-output');
+  const outputCode = get<HTMLElement>(shadow, '.creasekit-output-code');
   const hoverRect = get<SVGRectElement>(shadow, '.is-hover');
   const selectedRect = get<SVGRectElement>(shadow, '.is-selected');
-  const hoverLabel = get<HTMLElement>(shadow, '.crease-hover-label');
-  const sizeLabel = get<HTMLElement>(shadow, '.crease-size-label');
-  const toast = get<HTMLElement>(shadow, '.crease-toast');
-  const pins = get<HTMLElement>(shadow, '.crease-pins');
-  const toolbar = get<HTMLElement>(shadow, '.crease-toolbar');
+  const hoverLabel = get<HTMLElement>(shadow, '.creasekit-hover-label');
+  const sizeLabel = get<HTMLElement>(shadow, '.creasekit-size-label');
+  const toast = get<HTMLElement>(shadow, '.creasekit-toast');
+  const pins = get<HTMLElement>(shadow, '.creasekit-pins');
+  const toolbar = get<HTMLElement>(shadow, '.creasekit-toolbar');
   const controller = new AbortController();
   let frame: number | null = null;
   let toastTimer: number | null = null;
@@ -298,7 +298,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     try {
       await options.agent.unshare(runtimeId);
       state.shared = false;
-      showToast('Shared snapshot removed from Crease MCP');
+      showToast('Shared snapshot removed from creasekit MCP');
     } catch {
       state.shareError = true;
       showToast('Could not stop sharing. Retry while the local dev server is running.');
@@ -330,7 +330,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
         return;
       }
       state.shared = true;
-      showToast('Snapshot shared with Crease MCP');
+      showToast('Snapshot shared with creasekit MCP');
     } catch {
       state.shared = true;
       state.shareError = true;
@@ -405,7 +405,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       )
         return;
       const pin = document.createElement('button');
-      pin.className = `crease-pin${annotation.status === 'resolved' ? ' is-resolved' : ''}`;
+      pin.className = `creasekit-pin${annotation.status === 'resolved' ? ' is-resolved' : ''}`;
       pin.textContent = `${index + 1}`;
       pin.dataset.action = 'focus-note';
       pin.dataset.annotationId = annotation.id;
@@ -426,7 +426,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     );
     setRect(selectedRect, state.selected);
     const element = state.selected ?? state.hovered;
-    const handles = get<SVGGElement>(shadow, '.crease-selection-handles');
+    const handles = get<SVGGElement>(shadow, '.creasekit-selection-handles');
     handles.replaceChildren();
     hoverLabel.hidden = !state.open || element === null;
     sizeLabel.hidden =
@@ -452,7 +452,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
           .map(({ x, y }) => `<rect x="${x - 2}" y="${y - 2}" width="4" height="4"/>`)
           .join('');
     }
-    get<SVGGElement>(shadow, '.crease-distances').innerHTML =
+    get<SVGGElement>(shadow, '.creasekit-distances').innerHTML =
       state.open &&
       state.alt &&
       state.selected !== null &&
@@ -466,13 +466,13 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
           )
         : '';
     if (!layout) return;
-    get<SVGGElement>(shadow, '.crease-rulers').innerHTML =
+    get<SVGGElement>(shadow, '.creasekit-rulers').innerHTML =
       state.open && state.rulers
         ? rulerMarkup(window.innerWidth, window.innerHeight)
         : '';
-    const xray = get<SVGGElement>(shadow, '.crease-xray');
+    const xray = get<SVGGElement>(shadow, '.creasekit-xray');
     xray.replaceChildren();
-    get<HTMLElement>(shadow, '.crease-limit').hidden = true;
+    get<HTMLElement>(shadow, '.creasekit-limit').hidden = true;
     if (state.open && state.xray) {
       const outlines: Array<string> = [];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
@@ -498,7 +498,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
         );
       }
       xray.innerHTML = outlines.join('');
-      get<HTMLElement>(shadow, '.crease-limit').hidden =
+      get<HTMLElement>(shadow, '.creasekit-limit').hidden =
         outlines.length < 500 && scanned < 2000;
     }
     renderPins();
@@ -530,7 +530,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
 
   const row = (label: string, value: string): HTMLElement => {
     const container = document.createElement('div');
-    container.className = 'crease-detail';
+    container.className = 'creasekit-detail';
     const key = document.createElement('span');
     key.textContent = label;
     const content = document.createElement('strong');
@@ -548,11 +548,11 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     const target =
       state.selected === null ? saved?.target : snapshotElement(state.selected);
     if (target === undefined) return;
-    get<HTMLElement>(shadow, '.crease-tag').textContent = target.tag;
-    get<HTMLElement>(shadow, '.crease-card-title').textContent =
+    get<HTMLElement>(shadow, '.creasekit-tag').textContent = target.tag;
+    get<HTMLElement>(shadow, '.creasekit-card-title').textContent =
       target.text || target.role || target.tag;
     const selector = document.createElement('code');
-    selector.className = 'crease-selector';
+    selector.className = 'creasekit-selector';
     selector.textContent = target.selector;
     if (state.composerOpen) {
       if (state.selected === null)
@@ -574,7 +574,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     }
     if (state.mode === 'color') {
       const hint = document.createElement('p');
-      hint.className = 'crease-subtitle';
+      hint.className = 'creasekit-subtitle';
       hint.textContent = 'Computed CSS colors. Click a swatch to copy.';
       details.append(hint);
       for (const { label, value } of [
@@ -582,7 +582,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
         { label: 'Background', value: style.backgroundColor },
       ]) {
         const swatch = document.createElement('button');
-        swatch.className = 'crease-swatch';
+        swatch.className = 'creasekit-swatch';
         swatch.dataset.action = 'copy-color';
         swatch.dataset.color = value;
         const color = document.createElement('i');
@@ -598,8 +598,8 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       return;
     }
     const dimensions = document.createElement('div');
-    dimensions.className = 'crease-dimensions';
-    dimensions.innerHTML = `<div class="crease-dimension"><span>W</span>${number(target.bounds.width)}</div><div class="crease-dimension"><span>H</span>${number(target.bounds.height)}</div>`;
+    dimensions.className = 'creasekit-dimensions';
+    dimensions.innerHTML = `<div class="creasekit-dimension"><span>W</span>${number(target.bounds.width)}</div><div class="creasekit-dimension"><span>H</span>${number(target.bounds.height)}</div>`;
     details.append(
       dimensions,
       row('Position', `${number(target.bounds.x)}, ${number(target.bounds.y)}`),
@@ -613,13 +613,13 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     if (spacing !== null)
       details.append(row('Distance', `${spacing.value}px ${spacing.axis}`));
     const label = document.createElement('p');
-    label.className = 'crease-section-label';
+    label.className = 'creasekit-section-label';
     label.textContent = 'Element locator';
     details.append(label, selector);
   };
 
   const renderFoldkit = (): void => {
-    const panel = get<HTMLElement>(shadow, '.crease-foldkit');
+    const panel = get<HTMLElement>(shadow, '.creasekit-foldkit');
     const historyOpen = panel.querySelector('details')?.open ?? false;
     panel.replaceChildren();
     panel.hidden =
@@ -631,11 +631,11 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       return;
     }
     const heading = document.createElement('div');
-    heading.className = 'crease-foldkit-heading';
-    heading.innerHTML = `${icon('crease')}<strong>FoldKit</strong><span>Registered context</span>`;
+    heading.className = 'creasekit-foldkit-heading';
+    heading.innerHTML = `${icon('creasekit')}<strong>FoldKit</strong><span>Registered context</span>`;
     panel.append(heading);
     const source = document.createElement('button');
-    source.className = 'crease-source';
+    source.className = 'creasekit-source';
     source.dataset.action = 'open-source';
     source.dataset.source = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`}`;
     source.textContent = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`} → ${context.source.view}`;
@@ -643,7 +643,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
     panel.append(source, row('Scope', context.boundary));
     for (const event of context.events) panel.append(row(event.event, event.message));
     const consent = document.createElement('button');
-    consent.className = 'crease-action crease-model-toggle';
+    consent.className = 'creasekit-action creasekit-model-toggle';
     consent.dataset.action = 'toggle-model';
     consent.setAttribute('aria-pressed', `${state.includeModel}`);
     consent.textContent = state.includeModel
@@ -651,29 +651,29 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       : 'Include scoped Model & history';
     panel.append(consent);
     const hint = document.createElement('p');
-    hint.className = 'crease-subtitle';
+    hint.className = 'creasekit-subtitle';
     hint.textContent =
       'Opt-in fields may be captured in notes and shared snapshots. Model values are never saved to local storage.';
     panel.append(hint);
     if (context.model === undefined) return;
     const model = document.createElement('pre');
-    model.className = 'crease-model-code';
+    model.className = 'creasekit-model-code';
     model.textContent = JSON.stringify(context.model, null, 2);
     panel.append(model);
     const history = document.createElement('details');
-    history.className = 'crease-context-history';
+    history.className = 'creasekit-context-history';
     history.open = historyOpen;
     const summary = document.createElement('summary');
     summary.textContent = `Observed scope updates (${context.history?.length ?? 0})`;
     history.append(summary);
     const disclaimer = document.createElement('p');
-    disclaimer.className = 'crease-subtitle';
+    disclaimer.className = 'creasekit-subtitle';
     disclaimer.textContent =
       'Updates observed in this registered scope, not inferred element-to-Command causality.';
     history.append(disclaimer);
     for (const change of [...(context.history ?? [])].reverse()) {
       const item = document.createElement('pre');
-      item.className = 'crease-model-code';
+      item.className = 'creasekit-model-code';
       item.textContent = `${change.message}\n${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`;
       history.append(item);
     }
@@ -683,29 +683,29 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
   const renderNotes = (): void => {
     list.replaceChildren();
     if (state.feedback.annotations.length === 0) {
-      list.innerHTML = `<div class="crease-empty">${icon('note')}<strong>A little context goes a long way.</strong><p>Choose Annotate, click an element,<br>and leave your first note.</p></div>`;
+      list.innerHTML = `<div class="creasekit-empty">${icon('note')}<strong>A little context goes a long way.</strong><p>Choose Annotate, click an element,<br>and leave your first note.</p></div>`;
       return;
     }
     state.feedback.annotations.forEach((annotation, index) => {
       const item = document.createElement('article');
-      item.className = 'crease-list-item';
+      item.className = 'creasekit-list-item';
       const head = document.createElement('div');
-      head.className = 'crease-list-item-head';
+      head.className = 'creasekit-list-item-head';
       const target = document.createElement('button');
-      target.className = 'crease-list-target';
+      target.className = 'creasekit-list-target';
       target.dataset.action = 'focus-note';
       target.dataset.annotationId = annotation.id;
       target.textContent = `${index + 1}. ${annotation.target.tag} · ${annotation.target.text || annotation.target.role}`;
       const status = document.createElement('span');
-      status.className = `crease-list-item-status${annotation.status === 'open' ? ' is-open' : ''}`;
+      status.className = `creasekit-list-item-status${annotation.status === 'open' ? ' is-open' : ''}`;
       status.textContent =
         findTarget(annotation) === null ? 'Detached' : annotation.status;
       head.append(target, status);
       const comment = document.createElement('p');
-      comment.className = 'crease-list-item-comment';
+      comment.className = 'creasekit-list-item-comment';
       comment.textContent = annotation.comment;
       const actions = document.createElement('div');
-      actions.className = 'crease-list-item-actions';
+      actions.className = 'creasekit-list-item-actions';
       actions.innerHTML =
         actionButton(
           'toggle-status',
@@ -722,12 +722,12 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
   };
 
   function render(): void {
-    get<HTMLElement>(shadow, '.crease-toolrow').hidden = !state.open;
-    get<HTMLElement>(shadow, '.crease-launcher').setAttribute(
+    get<HTMLElement>(shadow, '.creasekit-toolrow').hidden = !state.open;
+    get<HTMLElement>(shadow, '.creasekit-launcher').setAttribute(
       'aria-expanded',
       `${state.open}`,
     );
-    const count = get<HTMLElement>(shadow, '.crease-count');
+    const count = get<HTMLElement>(shadow, '.creasekit-count');
     const openCount = state.feedback.annotations.filter(
       (annotation) => annotation.status === 'open',
     ).length;
@@ -739,10 +739,10 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       state.outputOpen ||
       state.settingsOpen;
     output.hidden = !state.open || !state.outputOpen;
-    get<HTMLElement>(shadow, '.crease-settings').hidden =
+    get<HTMLElement>(shadow, '.creasekit-settings').hidden =
       !state.open || !state.settingsOpen;
     composer.hidden = !state.composerOpen;
-    get<HTMLElement>(shadow, '.crease-card-actions').hidden = state.composerOpen;
+    get<HTMLElement>(shadow, '.creasekit-card-actions').hidden = state.composerOpen;
     get<HTMLButtonElement>(shadow, '[data-action="add"]').textContent =
       state.editingId === null ? 'Add note' : 'Save changes';
     get<HTMLButtonElement>(shadow, '[data-action="add"]').disabled =
@@ -783,16 +783,16 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
       state.feedback.undo.length === 0;
     get<HTMLButtonElement>(shadow, '[data-action="redo"]').disabled =
       state.feedback.redo.length === 0;
-    for (const item of shadow.querySelectorAll<HTMLElement>('.crease-model-setting'))
+    for (const item of shadow.querySelectorAll<HTMLElement>('.creasekit-model-setting'))
       item.hidden = options.foldkit === undefined;
     get<HTMLInputElement>(shadow, '[data-setting="model"]').checked =
       state.includeModel;
-    get<HTMLElement>(shadow, '.crease-storage-warning').hidden = !state.storageError;
-    get<HTMLElement>(shadow, '.crease-agent').hidden = options.agent === undefined;
+    get<HTMLElement>(shadow, '.creasekit-storage-warning').hidden = !state.storageError;
+    get<HTMLElement>(shadow, '.creasekit-agent').hidden = options.agent === undefined;
     get<HTMLButtonElement>(shadow, '[data-action="share"]').disabled = state.sharing;
     get<HTMLButtonElement>(shadow, '[data-action="unshare"]').hidden = !state.shared;
     get<HTMLButtonElement>(shadow, '[data-action="unshare"]').disabled = state.sharing;
-    get<HTMLElement>(shadow, '.crease-agent-status').textContent = state.sharing
+    get<HTMLElement>(shadow, '.creasekit-agent-status').textContent = state.sharing
       ? 'Updating shared snapshot…'
       : state.shareError
         ? 'Shared state could not be confirmed. Retry or stop sharing.'
@@ -1108,7 +1108,7 @@ export const mountCrease = (options: CreaseOptions = {}): CreaseHandle => {
         return;
       }
       render();
-      get<HTMLButtonElement>(shadow, '.crease-launcher').focus();
+      get<HTMLButtonElement>(shadow, '.creasekit-launcher').focus();
       return;
     }
     if (

@@ -1,32 +1,70 @@
 {
-  "name": "crease",
+  "name": "creasekit",
   "version": "0.1.0",
-  "private": true,
+  "description": "Visual feedback for FoldKit: inspect elements, leave notes, and share context with coding agents through MCP.",
+  "keywords": [
+    "annotations",
+    "devtools",
+    "foldkit",
+    "mcp",
+    "visual-feedback"
+  ],
+  "homepage": "https://github.com/dallenpyrah/creasekit#readme",
+  "bugs": "https://github.com/dallenpyrah/creasekit/issues",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dallenpyrah/creasekit.git"
+  },
+  "bin": {
+    "creasekit": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/types/src/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/types/server/vite-plugin.d.ts",
+      "import": "./dist/vite.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "npm run build:package && npm run build:site",
+    "build:package": "node scripts/build.mjs && tsc --project tsconfig.package.json",
+    "build:site": "vite build --outDir dist-site",
+    "preview": "vite preview --outDir dist-site",
     "typecheck": "tsc --noEmit",
     "format": "oxfmt",
     "test": "vitest run && vitest run --config server/vitest.config.ts",
     "test:ui": "vitest run",
     "test:server": "vitest run --config server/vitest.config.ts",
-    "mcp": "tsx server/mcp.ts",
-    "lint": "oxlint src server"
+    "test:package": "node --test scripts/package.test.mjs",
+    "mcp": "tsx server/cli.ts",
+    "prepack": "npm run build:package",
+    "lint": "oxlint src server scripts"
   },
   "dependencies": {
-    "@effect/platform-browser": "4.0.0-rc.112",
     "@effect/platform-node": "4.0.0-rc.112",
-    "@stylexjs/stylex": "0.19.0",
-    "effect": "4.0.0-rc.112",
-    "foldkit": "0.158.2"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
+    "@effect/platform-browser": "4.0.0-rc.112",
     "@foldkit/devtools": "0.158.2",
     "@foldkit/oxlint-plugin": "0.12.0",
     "@foldkit/vite-plugin": "0.20.2",
+    "@stylexjs/stylex": "0.19.0",
     "@stylexjs/unplugin": "0.19.0",
+    "esbuild": "0.28.2",
+    "foldkit": "0.158.2",
     "happy-dom": "20.11.13",
     "oxfmt": "0.66.0",
     "oxlint": "1.80.0",
@@ -34,5 +72,16 @@
     "typescript": "7.0.2",
     "vite": "8.2.2",
     "vitest": "4.1.11"
+  },
+  "peerDependencies": {
+    "vite": "^7.0.0 || ^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

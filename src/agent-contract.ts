@@ -1,7 +1,7 @@
 import { Schema } from 'effect';
 
-import { AnnotationArray, ElementTarget } from './domain';
-import { FoldkitContext } from './foldkit-schema';
+import { AnnotationArray, ElementTarget } from './domain.js';
+import { FoldkitContext } from './foldkit-schema.js';
 
 export const AgentSelection = Schema.Struct({
   target: ElementTarget,

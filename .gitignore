@@ -1,10 +1,13 @@
 node_modules
 dist
+dist-site
+*.tgz
 .vite
 .DS_Store
 coverage
 *.local
 .crease/
+.creasekit/
 .env
 .env.*
 *.swp

@@ -1,26 +1,26 @@
-# Crease — homepage and product design brief
+# creasekit — homepage and product design brief
 
-> Historical design brief, including superseded proposals and reference measurements. Use the [current design guide](../DESIGN.md) when changing Crease's interface.
+> Historical design brief, including superseded proposals and reference measurements. Use the [current design guide](../DESIGN.md) when changing creasekit's interface.
 
 Status: implemented Mesurer-led redesign, September 9, 2026. The user's later direction supersedes the original hybrid brief below.
 
 ## Implemented direction
 
-Match Mesurer's white, single-column homepage and upper-left white icon toolbar, while keeping Crease's name and FoldKit implementation. At a 1440px viewport, both live pages measure a 672px column at x=384, intro heading at y=170.5, Features at y=277.625, and How to use at y=852.125. Use locally served Inter, 15px body text, 16px feature icons, an 8px list gap, and 56px section gaps. The supplied screenshot's blue wash is a selected-element overlay, not a background color.
+Match Mesurer's white, single-column homepage and upper-left white icon toolbar, while keeping creasekit's name and FoldKit implementation. At a 1440px viewport, both live pages measure a 672px column at x=384, intro heading at y=170.5, Features at y=277.625, and How to use at y=852.125. Use locally served Inter, 15px body text, 16px feature icons, an 8px list gap, and 56px section gaps. The supplied screenshot's blue wash is a selected-element overlay, not a background color.
 
 The overlay uses compact 320px white anchored cards, thin blue element outlines and dimension labels, a bright blue active-tool state, tooltips and keyboard shortcuts, and a 400px feedback panel with Notes/Markdown/JSON tabs. The real tools include inspect, element notes, typography, computed color copying, rulers, capped X-ray, Alt spacing, persistent note pins, note undo/redo, and settings. No inactive placeholders advertise unimplemented arrows, pen, guides, screenshots, extension distribution, or MCP connectivity.
 
 The two homepage cards lead to the real FoldKit playground and show the local mounting API, rather than claiming a published npm package or Chrome extension. Mobile keeps the same visual language with a 350px content column at a 390px viewport, wrapping feature descriptions, stacked cards, and viewport-clamped panels.
 
-The final Crease mark is a modular C with a green folded corner, derived from FoldKit's geometric visual language. A single SVG supplies the homepage, toolbar, and favicon; it adapts for dark browser tabs. The inspector shows the FoldKit section only when actual registered context exists—no empty heading, divider, or unavailable-scope message. Registered source/Message metadata is compact, with scoped Model/history opt-in. The Feedback panel exposes explicit share/revoke controls for Crease's own read-only Effect v4 MCP server in development.
+The final creasekit mark is a modular C with a green folded corner, derived from FoldKit's geometric visual language. A single SVG supplies the homepage, toolbar, and favicon; it adapts for dark browser tabs. The inspector shows the FoldKit section only when actual registered context exists—no empty heading, divider, or unavailable-scope message. Registered source/Message metadata is compact, with scoped Model/history opt-in. The Feedback panel exposes explicit share/revoke controls for creasekit's own read-only Effect v4 MCP server in development.
 
 ## Original reference brief (superseded where it conflicts)
 
 ## Direction
 
-Combine Agentation’s narrow editorial documentation layout with Mesurer’s live, precise inspection interface. Crease should look like a small, thoughtfully made developer tool: white space, real typography, quiet rules, compact controls, and visible product behavior. Avoid a generic SaaS landing page with giant gradients, oversized cards, or invented testimonials.
+Combine Agentation’s narrow editorial documentation layout with Mesurer’s live, precise inspection interface. creasekit should look like a small, thoughtfully made developer tool: white space, real typography, quiet rules, compact controls, and visible product behavior. Avoid a generic SaaS landing page with giant gradients, oversized cards, or invented testimonials.
 
-Match the references’ hierarchy and density, but create Crease’s own wordmark, icon, illustrations, copy, and interaction styling. Do not reuse Agentation’s logo, screenshots, demo artwork, or package code.
+Match the references’ hierarchy and density, but create creasekit’s own wordmark, icon, illustrations, copy, and interaction styling. Do not reuse Agentation’s logo, screenshots, demo artwork, or package code.
 
 ## What was actually observed
 
@@ -36,11 +36,11 @@ At a 1440 × 1100 CSS-pixel viewport, live inspection found:
 | Surface              | Nearly white, low-contrast borders, soft demo shadow       | Computed body background is white                   |
 | Live interaction     | Click target → anchored dark comment composer              | Click typography target → small white property card |
 
-The blue tint across the supplied Mesurer screenshot is not its live page’s base background. Use blue as an inspection/selection state, not a permanent full-page wash. These are observations at one viewport, not hardcoded requirements for Crease.
+The blue tint across the supplied Mesurer screenshot is not its live page’s base background. Use blue as an inspection/selection state, not a permanent full-page wash. These are observations at one viewport, not hardcoded requirements for creasekit.
 
 ## Brand and copy
 
-Use an original folded-corner/crease glyph: two or three simple strokes suggesting a sheet folded along one diagonal. Pair it with a small typographic `crease` wordmark and a restrained “for FoldKit” label. Keep the glyph legible at 16px; it is also the collapsed tool launcher.
+Use an original folded-corner/creasekit glyph: two or three simple strokes suggesting a sheet folded along one diagonal. Pair it with a small typographic `creasekit` wordmark and a restrained “for FoldKit” label. Keep the glyph legible at 16px; it is also the collapsed tool launcher.
 
 Proposed hero:
 
@@ -48,7 +48,7 @@ Proposed hero:
 >
 > Inspect your FoldKit app, leave a note, and give your coding agent the context to make the change.
 
-Primary action: **Try Crease**. Secondary action: **Install**. A small monospace installation command sits beside or below the actions only once a real package is published. Before publication, show a clearly labeled local setup guide rather than a nonfunctional copy command.
+Primary action: **Try creasekit**. Secondary action: **Install**. A small monospace installation command sits beside or below the actions only once a real package is published. Before publication, show a clearly labeled local setup guide rather than a nonfunctional copy command.
 
 After source/MCP beta ships, a supporting line can read: “From the rendered element to its FoldKit source and Messages.” Do not claim that mapping on the clipboard-only alpha homepage.
 
@@ -57,7 +57,7 @@ After source/MCP beta ships, a supporting line can read: “From the rendered el
 ```text
 Desktop, centered shell
 
-crease / for FoldKit       Point at it.
+creasekit / for FoldKit       Point at it.
                           Tell your agent.
 Overview                  Short explanation + Try / Install
 Install
@@ -92,7 +92,7 @@ Documentation routes can grow from Overview and Install to Inspect, Annotate, Ou
 
 ## Proposed layout and tokens
 
-These are initial design values to validate visually, not extracted Crease styles.
+These are initial design values to validate visually, not extracted creasekit styles.
 
 | Token / constraint | Proposal                                                                 |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -122,7 +122,7 @@ Self-host fonts with their required license files, use font-display swap, and li
 
 ## Inspector interaction design
 
-Crease’s expanded toolbar has **Inspect**, **Measure**, **Annotate**, annotation count/list, **Copy**, agent status, settings, and collapse. Group additional tools behind a measure menu rather than packing every eventual feature into v0. Start with a light toolbar and support a tested dark theme later; Agentation’s dark composer is an inspiration, not a requirement to copy it.
+creasekit’s expanded toolbar has **Inspect**, **Measure**, **Annotate**, annotation count/list, **Copy**, agent status, settings, and collapse. Group additional tools behind a measure menu rather than packing every eventual feature into v0. Start with a light toolbar and support a tested dark theme later; Agentation’s dark composer is an inspiration, not a requirement to copy it.
 
 - **Hover:** one-pixel blue outline, low-opacity fill, and compact `button · 104 × 40` label. The label avoids the pointer and viewport edges.
 - **Selected:** persistent outline; target breadcrumb and ancestor picker; layout/type/color details live in one compact panel.

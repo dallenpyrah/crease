@@ -3,7 +3,7 @@ import {
   type ElementStyles,
   type ElementTarget,
   redactedPageUrl,
-} from './domain';
+} from './domain.js';
 
 const MAX_TEXT_LENGTH = 120;
 
@@ -40,12 +40,16 @@ const implicitRole = (element: Element): string => {
 };
 
 const visibleText = (element: Element): string => {
-  if (element.closest('[data-crease-private], input, textarea, select') !== null)
+  if (
+    element.closest(
+      '[data-creasekit-private], [data-crease-private], input, textarea, select',
+    ) !== null
+  )
     return '[redacted]';
   const clone = element.cloneNode(true);
   if (!(clone instanceof Element)) return '';
   for (const privateElement of clone.querySelectorAll(
-    'script, style, [hidden], [aria-hidden="true"], [data-crease-private], input, textarea, select, [data-crease-root]',
+    'script, style, [hidden], [aria-hidden="true"], [data-creasekit-private], [data-crease-private], input, textarea, select, [data-creasekit-root]',
   ))
     privateElement.remove();
   return (clone.textContent ?? '')
@@ -101,14 +105,14 @@ export const selectorFor = (element: Element): string => {
       break;
     }
 
-    const stableTarget = current.getAttribute('data-crease-target');
+    const stableTarget = current.getAttribute('data-creasekit-target');
     if (
       stableTarget &&
       document.querySelectorAll(
-        `[data-crease-target="${escapeSelector(stableTarget)}"]`,
+        `[data-creasekit-target="${escapeSelector(stableTarget)}"]`,
       ).length === 1
     ) {
-      parts.unshift(`[data-crease-target="${escapeSelector(stableTarget)}"]`);
+      parts.unshift(`[data-creasekit-target="${escapeSelector(stableTarget)}"]`);
       break;
     }
 

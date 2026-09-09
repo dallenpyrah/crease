@@ -22,14 +22,14 @@ import {
   startTestBridge,
   waitForSessionRemoval,
 } from './test-fixtures';
-import { creaseBridge } from './vite-plugin';
+import { creasekit } from './vite-plugin';
 
-describe('Crease Vite development bridge', () => {
+describe('creasekit Vite development bridge', () => {
   let root: string;
   let bridge: TestBridge;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'crease-vite-'));
+    root = await mkdtemp(join(tmpdir(), 'creasekit-vite-'));
     bridge = await startTestBridge(root);
   });
 
@@ -183,9 +183,9 @@ describe('Crease Vite development bridge', () => {
   });
 });
 
-describe('Crease bridge lifetime and binding', () => {
+describe('creasekit bridge lifetime and binding', () => {
   it('returns stale after TTL expiry and then removes the snapshot', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'crease-vite-ttl-'));
+    const root = await mkdtemp(join(tmpdir(), 'creasekit-vite-ttl-'));
     const bridge = await startTestBridge(root, 25);
     try {
       await postJson(bridge.session, BRIDGE_SHARE_PATH, snapshotFixture('short-lived'));
@@ -200,7 +200,7 @@ describe('Crease bridge lifetime and binding', () => {
   });
 
   it('fails configuration before binding to a non-loopback host', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'crease-vite-host-'));
+    const root = await mkdtemp(join(tmpdir(), 'creasekit-vite-host-'));
     try {
       await expect(
         createServer({
@@ -208,7 +208,7 @@ describe('Crease bridge lifetime and binding', () => {
           configFile: false,
           logLevel: 'silent',
           server: { host: '0.0.0.0', port: 0 },
-          plugins: [creaseBridge()],
+          plugins: [creasekit()],
         }),
       ).rejects.toThrow('requires server.host');
     } finally {

@@ -1,14 +1,18 @@
 import { Effect, Schema } from 'effect';
 
-import { type Annotation, AnnotationArray } from './domain';
-import { withoutModel } from './foldkit-context';
+import { type Annotation, AnnotationArray } from './domain.js';
+import { withoutModel } from './foldkit-context.js';
 
-const keyFor = (projectId: string) => `crease:${projectId}:annotations`;
+const keyFor = (projectId: string) => `creasekit:${projectId}:annotations`;
 
 export const makeLocalPersistence = (projectId: string) => ({
   load: Effect.sync<ReadonlyArray<Annotation>>(() => {
     try {
-      const raw = window.localStorage.getItem(keyFor(projectId));
+      const legacyProjectId =
+        projectId === 'creasekit-homepage' ? 'crease-homepage' : projectId;
+      const raw =
+        window.localStorage.getItem(keyFor(projectId)) ??
+        window.localStorage.getItem(`crease:${legacyProjectId}:annotations`);
       if (raw === null) {
         return [];
       }

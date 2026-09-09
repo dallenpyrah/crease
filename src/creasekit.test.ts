@@ -1,11 +1,15 @@
 import { Storage } from 'happy-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type CreaseHandle, type CreaseOptions, mountCrease } from './crease';
+import {
+  type CreasekitHandle,
+  type CreasekitOptions,
+  mountCreasekit,
+} from './creasekit';
 import { createFoldkitInspector } from './foldkit-context';
 
-describe('Crease overlay interactions', () => {
-  let crease: CreaseHandle;
+describe('creasekit overlay interactions', () => {
+  let creasekit: CreasekitHandle;
   let root: ShadowRoot;
   let target: HTMLButtonElement;
 
@@ -22,12 +26,12 @@ describe('Crease overlay interactions', () => {
     textarea.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   };
   const output = (): string =>
-    element<HTMLElement>('.crease-output-code').textContent ?? '';
+    element<HTMLElement>('.creasekit-output-code').textContent ?? '';
 
-  const remount = (options: CreaseOptions): void => {
-    crease.destroy();
-    crease = mountCrease({ projectId: 'test', startOpen: true, ...options });
-    const shadow = document.querySelector('[data-crease-root]')?.shadowRoot;
+  const remount = (options: CreasekitOptions): void => {
+    creasekit.destroy();
+    creasekit = mountCreasekit({ projectId: 'test', startOpen: true, ...options });
+    const shadow = document.querySelector('[data-creasekit-root]')?.shadowRoot;
     if (!shadow) throw new Error('Missing remounted overlay');
     root = shadow;
   };
@@ -61,14 +65,14 @@ describe('Crease overlay interactions', () => {
       new DOMRect(100, 100, 120, 40),
     );
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(target);
-    crease = mountCrease({ projectId: 'test', startOpen: true });
-    const shadow = document.querySelector('[data-crease-root]')?.shadowRoot;
+    creasekit = mountCreasekit({ projectId: 'test', startOpen: true });
+    const shadow = document.querySelector('[data-creasekit-root]')?.shadowRoot;
     if (!shadow) throw new Error('Missing overlay root');
     root = shadow;
   });
 
   afterEach(() => {
-    crease.destroy();
+    creasekit.destroy();
     vi.restoreAllMocks();
     window.localStorage.clear();
     vi.unstubAllGlobals();
@@ -80,7 +84,7 @@ describe('Crease overlay interactions', () => {
     click('compose');
     draft('Use a 12px gap.');
     click('add');
-    expect(element<HTMLElement>('.crease-pin').textContent).toBe('1');
+    expect(element<HTMLElement>('.creasekit-pin').textContent).toBe('1');
     click('open-output');
     element<HTMLButtonElement>('[data-output-format="json"]').click();
     expect(JSON.parse(output())[0].comment).toBe('Use a 12px gap.');
@@ -96,14 +100,14 @@ describe('Crease overlay interactions', () => {
     click('redo');
     expect(output()).toContain('Use a 12px gap.');
     expect(
-      JSON.parse(window.localStorage.getItem('crease:test:annotations') ?? '[]')[0]
+      JSON.parse(window.localStorage.getItem('creasekit:test:annotations') ?? '[]')[0]
         .comment,
     ).toBe('Use a 12px gap.');
     click('edit-note');
     draft('Use a 16px gap instead.');
     click('add');
     expect(
-      JSON.parse(window.localStorage.getItem('crease:test:annotations') ?? '[]')[0]
+      JSON.parse(window.localStorage.getItem('creasekit:test:annotations') ?? '[]')[0]
         .comment,
     ).toBe('Use a 16px gap instead.');
   });
@@ -113,14 +117,14 @@ describe('Crease overlay interactions', () => {
     target.addEventListener('click', clicked);
     target.click();
     expect(clicked).not.toHaveBeenCalled();
-    crease.close();
+    creasekit.close();
     target.click();
     expect(clicked).toHaveBeenCalledTimes(1);
-    crease.open();
-    crease.destroy();
+    creasekit.open();
+    creasekit.destroy();
     target.click();
     expect(clicked).toHaveBeenCalledTimes(2);
-    expect(document.querySelector('[data-crease-root]')).toBeNull();
+    expect(document.querySelector('[data-creasekit-root]')).toBeNull();
   });
 
   it('renders note content as text rather than executable markup', () => {
@@ -128,8 +132,8 @@ describe('Crease overlay interactions', () => {
     click('compose');
     draft('<img src=x onerror="alert(1)">');
     click('add');
-    expect(root.querySelector('.crease-list img')).toBeNull();
-    expect(element('.crease-list-item-comment').textContent).toBe(
+    expect(root.querySelector('.creasekit-list img')).toBeNull();
+    expect(element('.creasekit-list-item-comment').textContent).toBe(
       '<img src=x onerror="alert(1)">',
     );
   });
@@ -137,13 +141,13 @@ describe('Crease overlay interactions', () => {
   it('toggles working measurement controls without changing the page styles', () => {
     const style = target.getAttribute('style');
     click('rulers');
-    expect(element('.crease-rulers').childElementCount).toBeGreaterThan(0);
+    expect(element('.creasekit-rulers').childElementCount).toBeGreaterThan(0);
     click('xray');
-    expect(element('.crease-xray').childElementCount).toBeGreaterThan(0);
+    expect(element('.creasekit-xray').childElementCount).toBeGreaterThan(0);
     expect(target.getAttribute('style')).toBe(style);
-    crease.close();
-    expect(element('.crease-rulers').childElementCount).toBe(0);
-    expect(element('.crease-xray').childElementCount).toBe(0);
+    creasekit.close();
+    expect(element('.creasekit-rulers').childElementCount).toBe(0);
+    expect(element('.creasekit-xray').childElementCount).toBe(0);
   });
 
   it('copies the selected export format to the clipboard', async () => {
@@ -162,7 +166,7 @@ describe('Crease overlay interactions', () => {
     expect(write).toHaveBeenLastCalledWith(output());
     expect(output()).toContain('**Feedback:** Make the button wider.');
     await Promise.resolve();
-    expect(element('.crease-toast').textContent).toBe('Copied to clipboard');
+    expect(element('.creasekit-toast').textContent).toBe('Copied to clipboard');
   });
 
   it('reattaches persisted note pins on a fresh mount', () => {
@@ -170,15 +174,15 @@ describe('Crease overlay interactions', () => {
     click('compose');
     draft('Keep this note after reload.');
     click('add');
-    crease.destroy();
-    crease = mountCrease({ projectId: 'test', startOpen: true });
-    const shadow = document.querySelector('[data-crease-root]')?.shadowRoot;
+    creasekit.destroy();
+    creasekit = mountCreasekit({ projectId: 'test', startOpen: true });
+    const shadow = document.querySelector('[data-creasekit-root]')?.shadowRoot;
     if (!shadow) throw new Error('Missing remounted overlay');
     root = shadow;
-    expect(element('.crease-pin').getAttribute('aria-label')).toContain(
+    expect(element('.creasekit-pin').getAttribute('aria-label')).toContain(
       'Keep this note after reload.',
     );
-    expect(element('.crease-list-item-comment').textContent).toBe(
+    expect(element('.creasekit-list-item-comment').textContent).toBe(
       'Keep this note after reload.',
     );
   });
@@ -188,10 +192,10 @@ describe('Crease overlay interactions', () => {
     target.click();
     click('copy-selected');
     await vi.waitFor(() =>
-      expect(element<HTMLElement>('.crease-output').hidden).toBe(false),
+      expect(element<HTMLElement>('.creasekit-output').hidden).toBe(false),
     );
     expect(JSON.parse(output()).target.selector).toBe('#target');
-    expect(element('.crease-toast').textContent).toContain('Select the export text');
+    expect(element('.creasekit-toast').textContent).toContain('Select the export text');
   });
 
   it('reports memory-only notes rather than a false save on storage failure', () => {
@@ -202,9 +206,9 @@ describe('Crease overlay interactions', () => {
     click('compose');
     draft('Keep this note safe.');
     click('add');
-    expect(element<HTMLElement>('.crease-storage-warning').hidden).toBe(false);
-    expect(element('.crease-toast').textContent).toContain('memory only');
-    expect(element('.crease-list-item-comment').textContent).toBe(
+    expect(element<HTMLElement>('.creasekit-storage-warning').hidden).toBe(false);
+    expect(element('.creasekit-toast').textContent).toContain('memory only');
+    expect(element('.creasekit-list-item-comment').textContent).toBe(
       'Keep this note safe.',
     );
   });
@@ -217,14 +221,14 @@ describe('Crease overlay interactions', () => {
     target.remove();
     click('open-output');
     click('edit-note');
-    expect(element('.crease-details').textContent).toContain('Detached');
+    expect(element('.creasekit-details').textContent).toContain('Detached');
     draft('Updated while detached.');
     click('add');
-    expect(element('.crease-list-item-comment').textContent).toBe(
+    expect(element('.creasekit-list-item-comment').textContent).toBe(
       'Updated while detached.',
     );
     expect(
-      JSON.parse(window.localStorage.getItem('crease:test:annotations') ?? '[]')[0]
+      JSON.parse(window.localStorage.getItem('creasekit:test:annotations') ?? '[]')[0]
         .target.selector,
     ).toBe('#target');
   });
@@ -254,15 +258,15 @@ describe('Crease overlay interactions', () => {
     const unshare = vi.fn().mockResolvedValue(undefined);
     remount({ foldkit: foldkit(), agent: { share, unshare } });
     target.click();
-    expect(root.querySelector('.crease-model-code')).toBeNull();
+    expect(root.querySelector('.creasekit-model-code')).toBeNull();
     expect(share).not.toHaveBeenCalled();
     click('toggle-model');
-    expect(element('.crease-model-code').textContent).toContain('3');
+    expect(element('.creasekit-model-code').textContent).toContain('3');
     click('compose');
     draft('Reset should be easier to find.');
     click('add');
     const stored = JSON.parse(
-      window.localStorage.getItem('crease:test:annotations') ?? '[]',
+      window.localStorage.getItem('creasekit:test:annotations') ?? '[]',
     );
     expect(stored[0].foldkit.source.file).toBe('src/main.ts');
     expect(stored[0].foldkit.model).toBeUndefined();
@@ -270,7 +274,7 @@ describe('Crease overlay interactions', () => {
     click('open-output');
     click('share');
     await vi.waitFor(() =>
-      expect(element('.crease-agent-status').textContent).toContain(
+      expect(element('.creasekit-agent-status').textContent).toContain(
         'snapshot is shared',
       ),
     );
@@ -290,12 +294,12 @@ describe('Crease overlay interactions', () => {
   it('shows FoldKit context only for a registered target, without an empty-state section', () => {
     remount({ foldkit: foldkit() });
     target.click();
-    expect(element<HTMLElement>('.crease-foldkit').hidden).toBe(false);
-    expect(element('.crease-foldkit').textContent).toContain('src/main.ts');
+    expect(element<HTMLElement>('.creasekit-foldkit').hidden).toBe(false);
+    expect(element('.creasekit-foldkit').textContent).toContain('src/main.ts');
     target.id = 'unregistered';
     target.click();
-    expect(element<HTMLElement>('.crease-foldkit').hidden).toBe(true);
-    expect(element('.crease-foldkit').childElementCount).toBe(0);
+    expect(element<HTMLElement>('.creasekit-foldkit').hidden).toBe(true);
+    expect(element('.creasekit-foldkit').childElementCount).toBe(0);
   });
 
   it('revokes an in-flight shared Model snapshot if consent is withdrawn', async () => {

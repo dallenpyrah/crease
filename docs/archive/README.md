@@ -6,4 +6,4 @@ These records preserve the original investigation and design process. They conta
 - [Research and source audit](RESEARCH.md)
 - [Original design brief](DESIGN.md)
 
-For current behavior, start with the [Crease README](../../README.md). For implementation work, use the [contributor guide](../CONTRIBUTING.md).
+For current behavior, start with the [creasekit README](../../README.md). For implementation work, use the [contributor guide](../CONTRIBUTING.md).

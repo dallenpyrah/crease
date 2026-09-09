@@ -21,6 +21,7 @@
   },
   "ignorePatterns": [
     "dist/",
+    "dist-site/",
     "node_modules/",
     "**/*.d.ts",
     "vite.config.ts",

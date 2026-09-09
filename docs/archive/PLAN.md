@@ -1,14 +1,14 @@
-# Crease — build plan
+# creasekit — build plan
 
-> Historical planning notes from September 9, 2026. This record includes superseded proposals, not a current feature list or release commitment. Start with the [README](../../README.md) to use Crease or the [contributor guide](../CONTRIBUTING.md) to change it.
+> Historical planning notes from September 9, 2026. This record includes superseded proposals, not a current feature list or release commitment. Start with the [README](../../README.md) to use creasekit or the [contributor guide](../CONTRIBUTING.md) to change it.
 
 Research date: September 9, 2026. Status: a runnable local clipboard prototype is implemented. The roadmap below remains the broader release plan, not a claim of feature parity.
 
-Current implementation: FoldKit/StyleX homepage matching Mesurer's measured layout; independent Shadow DOM inspector with bounds, box model, typography, computed colors, viewport rulers, capped X-ray, Alt distances, anchored annotations, edit/delete/resolve/reopen, note undo/redo, local persistence, and Markdown/JSON export. Pointer geometry stays outside the host Model. Explicit registrations now connect targets to source files/views, static Message tags, opt-in scoped Models, and bounded observed history. Crease's own Effect v4 MCP server reads explicitly shared snapshots through a protected, loopback-only Vite bridge. See README.md for the implemented APIs and setup.
+Current implementation: FoldKit/StyleX homepage matching Mesurer's measured layout; independent Shadow DOM inspector with bounds, box model, typography, computed colors, viewport rulers, capped X-ray, Alt distances, anchored annotations, edit/delete/resolve/reopen, note undo/redo, local persistence, and Markdown/JSON export. Pointer geometry stays outside the host Model. Explicit registrations now connect targets to source files/views, static Message tags, opt-in scoped Models, and bounded observed history. creasekit's own Effect v4 MCP server reads explicitly shared snapshots through a protected, loopback-only Vite bridge. See README.md for the implemented APIs and setup.
 
-The user's later decisions supersede the original transport plan below: Crease owns its MCP server rather than extending FoldKit's MCP tool registry, and its logo is an original geometric C shared by the website, toolbar, and favicon. Automatic renderer/source instrumentation, causal tracing, drawing, arrows, guides, screenshots, and a distributable package remain roadmap work.
+The user's later decisions supersede the original transport plan below: creasekit owns its MCP server rather than extending FoldKit's MCP tool registry, and its logo is an original geometric C shared by the website, toolbar, and favicon. Automatic renderer/source instrumentation, causal tracing, drawing, arrows, guides, screenshots, and a distributable package remain roadmap work.
 
-Crease should be a FoldKit-native visual feedback tool: point at the running UI, inspect its layout, leave a comment, and give an agent a precise, reviewable description of what should change. Build an original implementation combining Agentation’s feedback workflow with Mesurer’s inspection tools, rather than porting either React package.
+creasekit should be a FoldKit-native visual feedback tool: point at the running UI, inspect its layout, leave a comment, and give an agent a precise, reviewable description of what should change. Build an original implementation combining Agentation’s feedback workflow with Mesurer’s inspection tools, rather than porting either React package.
 
 The first useful release must work without an agent connection. The differentiating release adds verified FoldKit source and runtime context through FoldKit’s existing DevTools transport.
 
@@ -25,7 +25,7 @@ Supporting documents:
 
 **Local-first:** no account, cloud database, telemetry, or hosted annotation service is needed. Annotations stay in the browser until the user explicitly copies or shares them. Agent access is a local development capability, not a production feature.
 
-**Package boundary:** provisionally call the optional visual package `@foldkit/crease`; npm scope access and name availability are not confirmed. Keep the product separate from the existing history panel, with an eventual integration entry in `@foldkit/devtools`. Extend `@foldkit/vite-plugin`, `foldkit`, and `@foldkit/devtools-mcp` upstream where necessary. Do not put all visual tooling into FoldKit’s core bundle.
+**Package boundary:** provisionally call the optional visual package `@foldkit/creasekit`; npm scope access and name availability are not confirmed. Keep the product separate from the existing history panel, with an eventual integration entry in `@foldkit/devtools`. Extend `@foldkit/vite-plugin`, `foldkit`, and `@foldkit/devtools-mcp` upstream where necessary. Do not put all visual tooling into FoldKit’s core bundle.
 
 **Stack:** TypeScript in strict mode, FoldKit for semantic UI state, Effect 4 for schemas and resource lifetimes, StyleX for styles, Vite for development and builds. No React renderer, Tailwind requirement, second state library, or new transport server.
 
@@ -35,9 +35,9 @@ Supporting documents:
 
 FoldKit already has a separate Shadow DOM DevTools runtime, Model and Message inspection, Submodel wrapper tags in history, a Vite relay, and an MCP server. These are useful foundations, not a complete visual-inspector extension API.
 
-The current protocol is a fixed set of requests; adding arbitrary tool names to Crease will not make the existing bridge accept them. Source instrumentation, DOM registration, browser handlers, schemas, relay support, and MCP tool registration must be coordinated changes. There is no verified public `Element → source line → Model path` API.
+The current protocol is a fixed set of requests; adding arbitrary tool names to creasekit will not make the existing bridge accept them. Source instrumentation, DOM registration, browser handlers, schemas, relay support, and MCP tool registration must be coordinated changes. There is no verified public `Element → source line → Model path` API.
 
-FoldKit also already brands view results with a function identity such as `src/view.ts#view`. That identity participates in rendering and hydration. Crease’s development-only location metadata must remain separate; changing a line number must never change VNode identity, keys, or patch behavior.
+FoldKit also already brands view results with a function identity such as `src/view.ts#view`. That identity participates in rendering and hydration. creasekit’s development-only location metadata must remain separate; changing a line number must never change VNode identity, keys, or patch behavior.
 
 Published versions observed during research:
 
@@ -62,7 +62,7 @@ Host FoldKit app
 │   └── proposed dev-only debug registry
 └── existing DevTools browser bridge
     ├── existing Model/history handlers
-    └── proposed Crease handlers
+    └── proposed creasekit handlers
                 ▲
                 │ existing Vite HMR custom events
                 ▼
@@ -76,14 +76,14 @@ Host FoldKit app
                 ▼
            Coding agent
 
-Crease browser runtime — separate from host Model
+creasekit browser runtime — separate from host Model
 ├── DOM picking and geometry resources
 ├── Shadow DOM toolbar, inspector, comments, pins
 ├── annotation store and export formatter
 └── explicit adapter to host debug data / bridge
 ```
 
-The browser-to-Vite leg already uses Vite’s HMR connection. The external MCP process connects to the separate relay port. Do not describe these as one new browser WebSocket or create a second relay for Crease.
+The browser-to-Vite leg already uses Vite’s HMR connection. The external MCP process connects to the separate relay port. Do not describe these as one new browser WebSocket or create a second relay for creasekit.
 
 ### Initial workspace
 
@@ -92,7 +92,7 @@ apps/
   website/                 FoldKit homepage, documentation, real demo
   playground/              deliberate DOM and FoldKit edge-case fixtures
 packages/
-  crease/
+  creasekit/
     src/domain/            schemas, update logic, export formatting
     src/dom/               picking, anchors, geometry, style sampling
     src/ui/                FoldKit views, toolbar, panels, pins
@@ -103,11 +103,11 @@ tests/
   browser/                 real geometry, input, HMR, and isolation tests
 ```
 
-Start with one publishable package and internal modules. Extract an Effect-only `@foldkit/crease-protocol` package when upstream browser and Node consumers need to share it; it must not import the UI or `foldkit`, preventing a dependency cycle. Package names and subpaths are proposals, not installable APIs today.
+Start with one publishable package and internal modules. Extract an Effect-only `@foldkit/creasekit-protocol` package when upstream browser and Node consumers need to share it; it must not import the UI or `foldkit`, preventing a dependency cycle. Package names and subpaths are proposals, not installable APIs today.
 
 ### Runtime ownership
 
-Mount a dedicated `Runtime.makeElement` program into an `HTMLElement` inside an open `ShadowRoot`; the runtime’s container is not the ShadowRoot itself. Use `Runtime.embed` and its disposal handle, or the same scoped-start pattern as existing DevTools. Set Crease’s own `devTools: false` to avoid recursively recording inspector activity. Do not disable the host’s DevTools, which also disables its MCP bridge.
+Mount a dedicated `Runtime.makeElement` program into an `HTMLElement` inside an open `ShadowRoot`; the runtime’s container is not the ShadowRoot itself. Use `Runtime.embed` and its disposal handle, or the same scoped-start pattern as existing DevTools. Set creasekit’s own `devTools: false` to avoid recursively recording inspector activity. Do not disable the host’s DevTools, which also disables its MCP bridge.
 
 The Model contains mode, selected annotation ID, panel state, drafts, and serializable annotation data. Keep live `Element` references, observers, animation-frame handles, and cached rectangles in scoped browser resources. Never persist DOM nodes or store them in the host Model.
 
@@ -117,7 +117,7 @@ Pointer motion is coalesced to one `requestAnimationFrame` update. It updates tr
 
 ## 4. DOM inspector and visual tools
 
-**Picking:** use pointer coordinates, `elementsFromPoint`, and event `composedPath`, excluding the Crease host and existing DevTools hosts. Support an ancestor/descendant picker for nested targets. Only intercept host clicks in active selection/annotation modes; idle mode must not interfere with the application.
+**Picking:** use pointer coordinates, `elementsFromPoint`, and event `composedPath`, excluding the creasekit host and existing DevTools hosts. Support an ancestor/descendant picker for nested targets. Only intercept host clicks in active selection/annotation modes; idle mode must not interfere with the application.
 
 **Geometry:** use CSS-pixel viewport rectangles from `getBoundingClientRect`. Record scroll and viewport context separately. Distance labels describe visible edge-to-edge spacing, not necessarily the author’s CSS `gap`; overlapping elements, transforms, margins, and multi-line text can make those different.
 
@@ -182,10 +182,10 @@ The first source-aware release can be valuable with file location and static Mes
 
 Offer **Copy selected**, **Copy all open**, and a readable output preview. Standard output includes comment, page, semantic target, source when verified, bounds, and a small style summary. Detailed output includes additional context explicitly selected by the user. Use deterministic ordering, escape captured content, and disclose truncation.
 
-Illustrative output, not a capture from a running Crease build:
+Illustrative output, not a capture from a running creasekit build:
 
 ```text
-Crease annotation cr_7 · open · revision 2
+creasekit annotation cr_7 · open · revision 2
 Page: /deploy · viewport 1440 × 900
 Feedback: The gap between these should be 12px.
 Target: button “Deploy”
@@ -217,11 +217,11 @@ The browser owns the persisted annotations; MCP operates through its bridge, not
 
 ### Required security work
 
-The audited relay constructs `new WebSocketServer({ port })` without an explicit loopback host. Do not assume its localhost log message is an access-control guarantee. Before enabling Crease’s richer data, require explicit loopback binding, Origin/Host checks appropriate to each transport leg, and authenticated local-session access. Credentials belong in the local MCP/Vite handshake, never exported annotations or browser-visible URLs. Remote development needs an explicit trusted-tunnel design; no public port exposure by default.
+The audited relay constructs `new WebSocketServer({ port })` without an explicit loopback host. Do not assume its localhost log message is an access-control guarantee. Before enabling creasekit’s richer data, require explicit loopback binding, Origin/Host checks appropriate to each transport leg, and authenticated local-session access. Credentials belong in the local MCP/Vite handshake, never exported annotations or browser-visible URLs. Remote development needs an explicit trusted-tunnel design; no public port exposure by default.
 
 Do not capture password/input values, hidden text, authentication headers, arbitrary Model contents, or full source files. Redact sensitive DOM regions, URL parameters, Model paths, and user-selected exclusions before persistence and before sharing. Shadow DOM is CSS isolation, not a security boundary against the host page.
 
-Treat DOM text and annotations as untrusted data in MCP descriptions and exports. Do not add arbitrary JS evaluation, filesystem access, or shell execution tools. Reusing the MCP server means existing host tools may still permit dispatch/replay: Crease’s read policy does not revoke those. Document their permissions separately and keep dispatch disabled unless the host explicitly opts in with its Message Schema.
+Treat DOM text and annotations as untrusted data in MCP descriptions and exports. Do not add arbitrary JS evaluation, filesystem access, or shell execution tools. Reusing the MCP server means existing host tools may still permit dispatch/replay: creasekit’s read policy does not revoke those. Document their permissions separately and keep dispatch disabled unless the host explicitly opts in with its Message Schema.
 
 AFS 1.1 interoperability is optional later work. Its coordinates and lifecycle differ from this model, and Agentation’s code license is restrictive. Use an independently authored mapping only after checking the format’s reuse terms; do not import its implementation or claim compatibility without fixtures.
 
@@ -229,7 +229,7 @@ AFS 1.1 interoperability is optional later work. Its coordinates and lifecycle d
 
 Use the official `@stylexjs/unplugin` Vite integration. Bridge `stylex.props()` into FoldKit’s `h.Class` and `h.Style`, preserving dynamic variables and class merging. `stylex.attrs()` exists, but its serialized style string is not a direct match for `h.Style`’s record shape. The adapter must be exercised in a real browser.
 
-Compiled document CSS does not automatically style a ShadowRoot. Produce an explicit overlay CSS asset and install it inside every Crease root, using a stylesheet link or adopted stylesheet with a supported fallback. Prove development HMR updates the shadow stylesheet and a packed production consumer can locate the emitted asset. Reset inherited fonts, direction, and custom properties deliberately; test hostile host CSS and CSP.
+Compiled document CSS does not automatically style a ShadowRoot. Produce an explicit overlay CSS asset and install it inside every creasekit root, using a stylesheet link or adopted stylesheet with a supported fallback. Prove development HMR updates the shadow stylesheet and a packed production consumer can locate the emitted asset. Reset inherited fonts, direction, and custom properties deliberately; test hostile host CSS and CSP.
 
 Keep browser-only code out of module evaluation for SSR. Default Vite integration is development-only and must disappear from ordinary production bundles. The public homepage may explicitly include the demo inspector, with all MCP/state access disabled; that is an intentional exception, not a devtools leak.
 
@@ -261,7 +261,7 @@ Tests should prove the actual user workflow and the difficult boundaries:
 3. **Browser:** Chromium first, then Firefox and WebKit for core selection/comment/copy; nested scroll, sticky/fixed/transformed elements, browser zoom, high DPI, open shadow roots, top-layer dialogs, navigation, storage failure, clipboard denial, focus return, and host keyboard shortcuts.
 4. **MCP:** validate both ingress and egress; explicit multi-runtime targeting; sharing consent; hostile DOM text; invalid schemas; response-size caps; offline/reconnect; idempotent retries; agent/human concurrent edits; no unintended dispatch.
 5. **Packaging:** SSR import smoke test, development-only injection, production asset/source scan, independent packed consumer, stylesheet HMR, strict CSP behavior, clean uninstall.
-6. **Visual:** compare desktop 1440/2000, tablet 768, and mobile 390 layouts to the design brief. The demo must use the actual Crease package, not a separately implemented animation.
+6. **Visual:** compare desktop 1440/2000, tablet 768, and mobile 390 layouts to the design brief. The demo must use the actual creasekit package, not a separately implemented animation.
 
 Proposed performance budgets: inactive mode has no continuous frame loop or repeated layout reads; active pointer work has p95 under 4 ms per frame on a documented 5,000-element desktop fixture; normal overlay work creates no tasks over 50 ms. Record device/browser/viewport and bundle-size baselines in Phase 0 before turning these into release gates; these are targets, not results.
 
@@ -269,8 +269,8 @@ Proposed performance budgets: inactive mode has no continuous frame loop or repe
 
 ## 11. Decisions that do not block the plan
 
-- Working brand: **Crease**, described as “Visual feedback for FoldKit.” Confirm npm scope and website domain before publishing.
-- Proposed Crease code license: MIT, subject to owner approval and dependency/license review. Agentation assets and implementation code are excluded; Mesurer reuse would retain its MIT notices.
+- Working brand: **creasekit**, described as “Visual feedback for FoldKit.” Confirm npm scope and website domain before publishing.
+- Proposed creasekit code license: MIT, subject to owner approval and dependency/license review. Agentation assets and implementation code are excluded; Mesurer reuse would retain its MIT notices.
 - Preferred integration: companion upstream FoldKit changes. If upstream access or acceptance is unavailable, ship the DOM/clipboard alpha and explicitly leave source/MCP capability unsupported; do not silently substitute a brittle private-API adapter or second server.
 - Homepage starts as a static FoldKit site plus a hydrated demo. Select the actual hosting target before deployment; no hosting or account setup is needed to begin implementation.
 

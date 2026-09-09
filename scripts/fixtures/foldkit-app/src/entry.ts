@@ -1,7 +1,6 @@
 import { Runtime } from 'foldkit';
 
-import { mountCreasekit } from './creasekit';
-import { Message, Model, init, update, view } from './main';
+import { Model, init, update, view } from './main';
 
 const integration = import.meta.env.DEV
   ? (await import('./development')).makeDevelopmentIntegration(init().model)
@@ -18,16 +17,12 @@ const application = Runtime.makeApplication({
 
 Runtime.run(application);
 
-const creasekit = mountCreasekit({
-  projectId: 'creasekit-homepage',
-  startOpen: true,
-  ...(integration === undefined
-    ? {}
-    : { foldkit: integration.foldkit, agent: integration.agent }),
-});
-
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => creasekit.destroy());
+if (import.meta.env.DEV) {
+  const { mountCreasekit } = await import('creasekit');
+  const creasekit = mountCreasekit({
+    projectId: 'packed-consumer',
+    startOpen: true,
+    ...integration,
+  });
+  import.meta.hot?.dispose(() => creasekit.destroy());
 }
-
-export { Message };

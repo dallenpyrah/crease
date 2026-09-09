@@ -4,7 +4,7 @@ import {
   type FoldkitChange,
   type FoldkitContext,
   FoldkitSource,
-} from './foldkit-schema';
+} from './foldkit-schema.js';
 
 export interface FoldkitRegistration<Model> {
   readonly boundary: string;
@@ -81,7 +81,7 @@ export const createFoldkitInspector = <Model>(options: {
       /^[a-z]+:/i.test(source.file)
     ) {
       throw new Error(
-        'Crease source registrations must use project-relative file paths.',
+        'creasekit source registrations must use project-relative file paths.',
       );
     }
     return {

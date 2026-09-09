@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
 
-import { type Annotation, AnnotationArray } from './domain';
+import { type Annotation, AnnotationArray } from './domain.js';
 
 const formatNumber = (value: number): string =>
   Number.isInteger(value) ? `${value}` : value.toFixed(1);
@@ -51,7 +51,7 @@ const formatAnnotation = (annotation: Annotation, index: number): string => {
 
 export const formatMarkdown = (annotations: ReadonlyArray<Annotation>): string =>
   [
-    '# Crease feedback',
+    '# creasekit feedback',
     '',
     'Context captured from the running interface. Review before editing code.',
     '',

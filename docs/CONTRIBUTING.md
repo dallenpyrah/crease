@@ -1,104 +1,70 @@
-# Change or integrate Crease
+# Contribute to creasekit
 
-Use this guide when changing Crease or adapting its local inspector to another FoldKit application. To inspect a page or share feedback without changing the implementation, start with the [README](../README.md).
+Use this guide when changing creasekit itself. To add creasekit to another FoldKit application, start with the [consumer setup](../README.md#add-creasekit-to-an-existing-app) instead.
 
-Crease currently runs from this repository. It does not provide a published package or a drop-in browser extension. The existing homepage is the working integration example.
+## Set up the repository
 
-## Set up and check a change
+creasekit requires Node.js 22.12 or later. Use the repository's `.nvmrc` when it is available, then run the demo from the repository root:
 
-Use Node 26, as specified in [`.nvmrc`](../.nvmrc). From the repository root, run:
-
-```sh
+```bash
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:4173`. Keep the server on loopback; enabling access from other machines is not a supported way to test the agent connection.
+Open `http://127.0.0.1:4173`. This port belongs to the repository demo only; a consuming application keeps its own Vite URL and configuration. Keep the demo on local HTTP loopback while testing MCP sharing.
 
-Before handing off a change, run:
+## Validate a change
 
-```sh
+Run the checks that cover the files you changed:
+
+```bash
 npm run typecheck
 npm run lint
 npm test
 npm run build
+npm run test:package
 ```
 
-The [GitHub workflow](../.github/workflows/check.yml) runs those checks on pushes and pull requests. Use `npm run test:ui` or `npm run test:server` for focused iterations. Check Markdown formatting with `npm run format -- --check README.md 'docs/**/*.md'`.
+`npm run build` runs both outputs: `npm run build:package` writes the distributable package to `dist`, and `npm run build:site` writes the demo site to `dist-site`. Use the focused UI or server test commands while iterating, then run the relevant full checks before handoff. Check documentation formatting with:
 
-UI tests cover state transitions, rendered views, geometry, exports, persistence, and consent. Server tests cover sharing boundaries and the actual stdio MCP connection. For a visual or interaction change, also check the page in a browser: tests against a simulated document cannot establish contrast, panel positioning, or operating-system clipboard behavior.
+```bash
+npm run format -- --check README.md 'docs/**/*.md'
+```
+
+For an overlay or interaction change, also inspect the demo in a browser at desktop and narrow widths. DOM tests cannot establish contrast, panel placement, clipboard behavior, or whether the host page remains usable when inspection is closed.
 
 ## Find the relevant code
 
-| Change                                       | Start here                                                                                                  |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Homepage content, counter, or layout         | [`src/main.ts`](../src/main.ts), [`src/styles.ts`](../src/styles.ts), [`src/styles.css`](../src/styles.css) |
-| Inspector controls and panel interactions    | [`src/crease.ts`](../src/crease.ts), [`src/geometry.ts`](../src/geometry.ts)                                |
-| Note state, undo/redo, or saved feedback     | [`src/feedback.ts`](../src/feedback.ts), [`src/persistence.ts`](../src/persistence.ts)                      |
-| Registered source, Messages, or scoped state | [`src/development.ts`](../src/development.ts), [`src/foldkit-context.ts`](../src/foldkit-context.ts)        |
-| Runtime mounting and cleanup                 | [`src/entry.ts`](../src/entry.ts)                                                                           |
-| Snapshot data or agent tools                 | [`src/agent-contract.ts`](../src/agent-contract.ts), [`server/mcp.ts`](../server/mcp.ts)                    |
-| Local sharing, authentication, or expiry     | [`server/vite-plugin.ts`](../server/vite-plugin.ts), [`server/bridge.ts`](../server/bridge.ts)              |
-
-## Register FoldKit context
-
-Crease does not infer source files or Model ownership from rendered HTML. Add an explicit registration that connects stable element selectors to the source, event Messages, and state fields you want to expose.
-
-For example, this module under `src/` registers the existing playground's Reset control:
-
-```ts
-import { createFoldkitInspector } from './foldkit-context';
-import { init, Message } from './main';
-
-export const foldkit = createFoldkitInspector({
-  initialModel: init().model,
-  registrations: [
-    {
-      boundary: 'Homepage / Counter',
-      source: { file: 'src/main.ts', view: 'view' },
-      targets: [
-        {
-          selector: '[data-crease-target="playground-reset"]',
-          events: [{ event: 'click', message: Message.ClickedReset()._tag }],
-        },
-      ],
-      project: (model) => ({ playgroundCount: model.playgroundCount }),
-    },
-  ],
-});
-```
-
-Follow the runtime wiring in [`src/entry.ts`](../src/entry.ts): wrap the host's `update` with `foldkit.observeUpdate(update)`, wrap its `view` with `foldkit.observeView(view)`, and pass `foldkit` to `mountCrease`. The existing [`makeDevelopmentIntegration`](../src/development.ts) combines registrations with the agent connection, so extend it rather than mounting a second inspector in the demo.
-
-Use project-relative source paths. Choose selectors that continue to identify the intended element after a render. Matching uses the closest registered ancestor, and registration order decides which match wins. Put narrower targets before broader ones when they overlap. The current API does not infer ownership for repeated or keyed component instances.
-
-Project only the state fields a reader needs. Sensitive key names are redacted and values are bounded, but those safeguards do not replace a narrow projection. The inspector retains at most ten observed updates per registration and does not write Model values or history to saved annotation storage.
+| Change                                                   | Start here                                                                                                                                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public package API                                       | [`src/index.ts`](../src/index.ts)                                                                                                                           |
+| Overlay controls, annotations, and self-contained styles | [`src/creasekit.ts`](../src/creasekit.ts), [`src/overlay-styles.ts`](../src/overlay-styles.ts)                                                              |
+| Development mount and demo registration                  | [`src/entry.ts`](../src/entry.ts), [`src/development.ts`](../src/development.ts)                                                                            |
+| Explicit FoldKit context and observation wrappers        | [`src/foldkit-context.ts`](../src/foldkit-context.ts)                                                                                                       |
+| Browser-to-local transport connection                    | [`src/agent-connection.ts`](../src/agent-connection.ts)                                                                                                     |
+| Public Vite plugin and local session protection          | [`server/vite-plugin.ts`](../server/vite-plugin.ts), [`server/bridge.ts`](../server/bridge.ts)                                                              |
+| CLI and MCP tools                                        | [`server/cli.ts`](../server/cli.ts), [`server/mcp.ts`](../server/mcp.ts)                                                                                    |
+| Package build and package smoke test                     | [`scripts/build.mjs`](../scripts/build.mjs), [`scripts/package.test.mjs`](../scripts/package.test.mjs), [`tsconfig.package.json`](../tsconfig.package.json) |
+| Demo application                                         | [`src/main.ts`](../src/main.ts)                                                                                                                             |
 
 ## Preserve the application boundary
 
-The observation wrappers return the original update and view results. Keep inspector state out of the host Model and pointer measurements out of its update loop. Crease must not change the host's VNode identity or dispatch Messages on an agent's behalf.
+The library is an observer and overlay, not part of the host application's Model. `observeUpdate` and `observeView` must return the host update and view results unchanged. Keep pointer measurements and overlay state outside the host update loop, do not alter VNode identity, and never dispatch application Messages on an agent's behalf.
 
-Recent updates describe what the registered scope observed. Do not present them as proof that selecting an element caused a Command. Render the FoldKit section only when a registration provides context; keep it absent for unregistered elements.
-
-[`src/entry.ts`](../src/entry.ts) loads the demo registration and agent connection only during development. Production builds keep the visual demo but exclude that development wiring. Preserve this separation when moving the integration to another application.
+Source, Message metadata, and Model values require explicit registrations. Do not imply that a DOM selector proves source ownership or that an observed update proves element-to-Message causality. Use project-relative source paths, stable selectors, and a narrow state projection. See [Register FoldKit context](FOLDKIT.md) for the public integration contract.
 
 ## Preserve the sharing boundary
 
-The browser captures a snapshot only when the user asks to share. It sends the snapshot to Crease's routes on the existing local development server. The MCP process authenticates to that server and reads stored snapshots; it does not browse the DOM or stream the host Model.
+The browser captures a snapshot only after user consent. The local Vite bridge stores it in memory, authenticates the MCP process through `.creasekit/mcp-session.json`, enforces the 15-minute TTL and size/session limits, and rejects non-loopback or HTTPS configurations.
 
-[`creaseBridge()`](../server/vite-plugin.ts), configured in [`vite.config.ts`](../vite.config.ts), owns those routes. It validates browser origins and request bodies, enforces limits and expiry, and rejects non-loopback or HTTPS configurations. It keeps snapshots in memory and recreates the protected session descriptor on restart. No additional TCP listener is required.
+Keep credentials out of browser data, logs, exports, and client configuration. Preserve pending-share and failed-revocation states rather than displaying a success state that was not confirmed. Treat captured page text and annotations as untrusted content, not instructions to execute. The MCP tools remain read-only.
 
-Keep credentials out of browser data, logs, exports, and client configuration. Preserve consent checks for pending shares and clear reporting when a share or revocation cannot be confirmed. Treat captured text and notes as untrusted content, not instructions to execute.
+## Package and release work
 
-For dependency changes, use the versions in [`package.json`](../package.json) and the lockfile. Check FoldKit's peer requirements before upgrading its runtime dependencies together; do not replace the pins with unrelated latest releases.
+The package build produces `dist`; the demo build produces `dist-site`. Keep consumer-facing exports limited to the documented public API and verify the packed package with `npm run test:package` when changing packaging, exports, or the CLI.
 
-## Troubleshooting
+Publishing is tag-triggered and uses `NPM_TOKEN` in GitHub Actions. A tag and workflow configuration are not proof of a completed publication: verify the workflow result and the registry before announcing a release.
 
-| Symptom                                        | What to check                                                                                                                                                   |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The new element has no FoldKit context.        | Confirm its selector matches, the registration is passed to `mountCrease`, and you are running the development app. Check for an earlier, broader registration. |
-| Scoped state or history does not update.       | Confirm both runtime wrappers are connected and the projection includes the fields you expect to observe. Enable Model consent in the inspector.                |
-| Styling differs between tests and the browser. | Preserve the existing test configuration's real stylesheet transform, then check the browser at desktop and narrow widths.                                      |
-| The dev server rejects its host or protocol.   | Restore the local HTTP configuration in `vite.config.ts`. Do not bypass the bridge's safety checks to expose it remotely.                                       |
+## Documentation and design
 
-See the [design guide](DESIGN.md) for interface conventions and the [historical notes](archive/README.md) for the original investigation. Historical proposals are not current API contracts or release commitments.
+Keep the README focused on installing creasekit into an existing application, not cloning the demo. Update [usage](USAGE.md), [MCP](MCP.md), and [FoldKit integration](FOLDKIT.md) documentation whenever the public behavior changes. Follow the [design guide](DESIGN.md) for visual changes.

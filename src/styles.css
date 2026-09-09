@@ -31,20 +31,20 @@ a:focus-visible {
 }
 
 @media (max-width: 720px) {
-  .crease-home-shell {
+  .creasekit-home-shell {
     padding-top: 96px !important;
     padding-bottom: 64px !important;
   }
 
-  .crease-home-cards {
+  .creasekit-home-cards {
     grid-template-columns: 1fr !important;
   }
 
-  .crease-home-playground {
+  .creasekit-home-playground {
     grid-template-columns: 1fr !important;
   }
 
-  .crease-home-playground-controls {
+  .creasekit-home-playground-controls {
     justify-content: flex-start !important;
   }
 }

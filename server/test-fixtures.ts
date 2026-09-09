@@ -5,7 +5,7 @@ import { type ViteDevServer, createServer } from 'vite';
 import type { AgentSnapshot } from '../src/agent-contract';
 import type { Annotation } from '../src/domain';
 import { type SessionDescriptor, readSessionFile, sessionFilePath } from './bridge';
-import { creaseBridge } from './vite-plugin';
+import { creasekit } from './vite-plugin';
 
 export const annotationFixture = (id = 'cr_note'): Annotation => ({
   version: 1,
@@ -50,7 +50,7 @@ export const snapshotFixture = (
 ): AgentSnapshot => ({
   version: 1,
   runtimeId,
-  projectId: 'crease-test',
+  projectId: 'creasekit-test',
   page: 'http://127.0.0.1:5173/settings',
   sharedAt: 2_000,
   selection: null,
@@ -76,7 +76,7 @@ export const startTestBridge = async (
       port: 0,
       strictPort: true,
     },
-    plugins: [creaseBridge(ttlMs === undefined ? undefined : { ttlMs })],
+    plugins: [creasekit(ttlMs === undefined ? undefined : { ttlMs })],
   });
   await server.listen();
 
@@ -101,7 +101,7 @@ export const waitForSessionRemoval = async (root: string): Promise<void> => {
     }
     await delay(10);
   }
-  throw new Error('Timed out waiting for the Crease session file to be removed');
+  throw new Error('Timed out waiting for the creasekit session file to be removed');
 };
 
 const waitForSession = async (root: string): Promise<SessionDescriptor> => {

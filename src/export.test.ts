@@ -41,7 +41,7 @@ const annotation: Annotation = {
   updatedAt: 1,
 };
 
-describe('Crease exports', () => {
+describe('creasekit exports', () => {
   it('produces deterministic Markdown for an agent', () => {
     expect(formatMarkdown([annotation])).toContain('Make the gap 12px.');
     expect(formatMarkdown([annotation])).toContain(

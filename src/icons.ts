@@ -1,4 +1,4 @@
-import creaseLogo from './assets/crease.svg';
+import creasekitLogo from './assets/creasekit.svg';
 
 const paths = {
   inspect:
@@ -22,9 +22,9 @@ const paths = {
   chevron: '<path d="m9 5 7 7-7 7"/>',
 };
 
-export type IconName = keyof typeof paths | 'crease';
+export type IconName = keyof typeof paths | 'creasekit';
 
 export const icon = (name: IconName): string =>
-  name === 'crease'
-    ? `<img class="crease-logo" src="${creaseLogo}" alt="" width="21" height="21"/>`
+  name === 'creasekit'
+    ? `<img class="creasekit-logo" src="${creasekitLogo.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}" alt="" width="21" height="21"/>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
