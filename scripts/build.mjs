@@ -1,4 +1,4 @@
-import { chmod, rm } from 'node:fs/promises';
+import { chmod, readFile, rm, writeFile } from 'node:fs/promises';
 
 import { build } from 'esbuild';
 
@@ -12,7 +12,7 @@ const shared = {
   legalComments: 'eof',
 };
 
-await Promise.all([
+const [, , cli] = await Promise.all([
   build({
     ...shared,
     entryPoints: { index: 'src/index.ts', automatic: 'src/automatic-entry.ts' },
@@ -34,7 +34,27 @@ await Promise.all([
     outfile: 'dist/cli.js',
     packages: 'bundle',
     platform: 'node',
+    metafile: true,
   }),
 ]);
 
+const bundledPackages = new Set();
+for (const output of Object.values(cli.metafile.outputs)) {
+  for (const [input, { bytesInOutput }] of Object.entries(output.inputs)) {
+    const directory = input.match(/^(.*node_modules\/(?:@[^/]+\/)?[^/]+)/)?.[1];
+    if (directory !== undefined && bytesInOutput > 0) bundledPackages.add(directory);
+  }
+}
+const notices = await Promise.all(
+  [...bundledPackages].sort().map(async (directory) => {
+    const { name, version } = JSON.parse(
+      await readFile(`${directory}/package.json`, 'utf8'),
+    );
+    return `${name}@${version}\n\n${await readFile(`${directory}/LICENSE`, 'utf8')}`;
+  }),
+);
+await writeFile(
+  new URL('../dist/THIRD_PARTY_NOTICES.txt', import.meta.url),
+  notices.join('\n\n---\n\n'),
+);
 await chmod(new URL('../dist/cli.js', import.meta.url), 0o755);

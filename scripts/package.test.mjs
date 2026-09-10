@@ -39,7 +39,7 @@ test(
           const paths = tarball.files.map((file) => file.path);
           for (const path of paths) {
             assert(
-              /^(package\.json|README\.md|LICENSE|dist\/(index|vite|cli|automatic)\.js|dist\/chunks\/[\w-]+\.js|dist\/types\/.+\.d\.ts)$/.test(
+              /^(package\.json|README\.md|LICENSE|dist\/THIRD_PARTY_NOTICES\.txt|dist\/(index|vite|cli|automatic)\.js|dist\/chunks\/[\w-]+\.js|dist\/types\/.+\.d\.ts)$/.test(
                 path,
               ),
               `Unexpected package file: ${path}`,
@@ -50,6 +50,7 @@ test(
             'dist/vite.js',
             'dist/cli.js',
             'dist/automatic.js',
+            'dist/THIRD_PARTY_NOTICES.txt',
             'dist/types/src/index.d.ts',
             'dist/types/server/vite-plugin.d.ts',
           ])
@@ -58,6 +59,29 @@ test(
             tarball.files.find((file) => file.path === 'dist/cli.js').mode & 0o111,
             0o111,
           );
+          const notices = await readFile(
+            join(root, 'dist/THIRD_PARTY_NOTICES.txt'),
+            'utf8',
+          );
+          for (const dependency of [
+            'effect',
+            '@effect/platform-node',
+            '@effect/platform-node-shared',
+            'detect-libc',
+            'msgpackr',
+            'msgpackr-extract',
+            'node-gyp-build-optional-packages',
+          ]) {
+            assert(notices.includes(`${dependency}@`));
+            assert(
+              notices.includes(
+                await readFile(
+                  join(root, 'node_modules', dependency, 'LICENSE'),
+                  'utf8',
+                ),
+              ),
+            );
+          }
           const browser = (
             await Promise.all(
               paths
