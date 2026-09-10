@@ -70,6 +70,7 @@
     "happy-dom": "20.11.13",
     "oxfmt": "0.66.0",
     "oxlint": "1.80.0",
+    "refractor": "5.0.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "vite": "8.2.2",

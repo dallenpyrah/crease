@@ -89,13 +89,40 @@ describe('homepage view', () => {
         Scene.text(
           'Automatic mounting is upcoming on main; installed 0.1.0 projects still need this block.',
         ),
-      ).toExist(),
+      ).toBeAbsent(),
+      Scene.expect(
+        Scene.text(
+          'Published 0.1.0 only includes source, Message, Model, and observed-update context when you explicitly register that scope. Review and consent to any Model data before sharing; automatic context is upcoming on main.',
+        ),
+      ).toBeAbsent(),
       Scene.expect(
         Scene.text(
           'The --cwd directory contains .creasekit/mcp-session.json. Choose Share snapshot only after reviewing the read-only snapshot, and choose Stop sharing to revoke the current one.',
         ),
       ).toExist(),
       Scene.expect(Scene.role('status')).toBeAbsent(),
+    );
+  });
+
+  it('renders language-specific syntax tokens in the setup examples', () => {
+    Scene.scene(
+      { update, view },
+      Scene.given(model()),
+      Scene.expect(
+        Scene.nth(Scene.all.selector('code[data-language="typescript"] .keyword'), 0),
+      ).toHaveText('import'),
+      Scene.expect(
+        Scene.nth(Scene.all.selector('code[data-language="typescript"] .string'), 0),
+      ).toHaveText("'@foldkit/vite-plugin'"),
+      Scene.expect(
+        Scene.nth(Scene.all.selector('code[data-language="json"] .property'), 0),
+      ).toHaveText('"mcpServers"'),
+      Scene.expect(
+        Scene.nth(Scene.all.selector('code[data-language="npm"] .function'), 0),
+      ).toHaveText('npm'),
+      Scene.expect(
+        Scene.nth(Scene.all.selector('code[data-language="gitignore"] .string'), 0),
+      ).toHaveText('.creasekit/'),
     );
   });
 

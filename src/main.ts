@@ -2,12 +2,23 @@ import * as stylex from '@stylexjs/stylex';
 import { Effect, Schema } from 'effect';
 import { Runtime, type Update } from 'foldkit';
 import * as Command from 'foldkit/command';
-import { Document, HtmlBuilder } from 'foldkit/html';
+import { Document, Html, HtmlBuilder } from 'foldkit/html';
 import { defineMessageUnion } from 'foldkit/message';
+import { refractor } from 'refractor/core';
+import bash from 'refractor/bash';
+import ignore from 'refractor/ignore';
+import json from 'refractor/json';
+import typescript from 'refractor/typescript';
 
 import metadata from '../package.json' with { type: 'json' };
 import creasekitLogo from './assets/creasekit.svg';
 import { styles } from './styles';
+
+refractor.register(bash);
+refractor.register(ignore);
+refractor.register(json);
+refractor.register(typescript);
+refractor.alias('bash', ['npm', 'bun']);
 
 type FeatureIcon =
   | 'toggle'
@@ -399,6 +410,41 @@ const copyFeedback = (model: Model, snippet: SetupSnippet): string | undefined =
     : 'Clipboard access was denied or is unavailable. Select this code and copy it manually.';
 };
 
+const tokenStyles: Readonly<Record<string, stylex.StyleXStyles>> = {
+  comment: styles.codeComment,
+  keyword: styles.codeKeyword,
+  operator: styles.codeKeyword,
+  string: styles.codeString,
+  property: styles.codeProperty,
+  number: styles.codeProperty,
+  boolean: styles.codeProperty,
+  constant: styles.codeProperty,
+  function: styles.codeFunction,
+  'function-name': styles.codeFunction,
+  'class-name': styles.codeFunction,
+  builtin: styles.codeBuiltin,
+  parameter: styles.codeBuiltin,
+  punctuation: styles.codePunctuation,
+};
+
+const codeToken = (
+  h: HtmlBuilder<Message>,
+  token: ReturnType<typeof refractor.highlight>['children'][number],
+): Html | string => {
+  if (token.type === 'text') return token.value;
+  if (token.type !== 'element') return '';
+  const names = Array.isArray(token.properties.className)
+    ? token.properties.className.map(String)
+    : [];
+  const colors = names
+    .map((name) => tokenStyles[name])
+    .filter((style): style is stylex.StyleXStyles => style !== undefined);
+  return h.span(
+    [classAttr(h, css(...colors), ...names)],
+    token.children.map((child) => codeToken(h, child)),
+  );
+};
+
 const snippetBlock = (h: HtmlBuilder<Message>, model: Model, snippet: SetupSnippet) => {
   const feedback = copyFeedback(model, snippet);
   const copied =
@@ -430,7 +476,17 @@ const snippetBlock = (h: HtmlBuilder<Message>, model: Model, snippet: SetupSnipp
       ),
       h.pre(
         [classAttr(h, css(styles.codeBlock))],
-        [h.code([classAttr(h, css(styles.code))], [snippet.code])],
+        [
+          h.code(
+            [
+              classAttr(h, css(styles.code)),
+              h.DataAttribute('language', snippet.language.toLowerCase()),
+            ],
+            refractor
+              .highlight(snippet.code, snippet.language.toLowerCase())
+              .children.map((token) => codeToken(h, token)),
+          ),
+        ],
       ),
       ...(feedback === undefined
         ? []
@@ -568,18 +624,12 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.p(
                         [classAttr(h, css(styles.stepText))],
                         [
-                          'Released 0.1.0 does not mount the overlay automatically. Add this development-only block after your existing Runtime.run(application) call.',
+                          'To mount the overlay explicitly, add this development-only block after your existing Runtime.run(application) call.',
                         ],
                       ),
                       h.div(
                         [classAttr(h, css(styles.snippetList))],
                         [snippetBlock(h, model, setupSnippet('development-mount'))],
-                      ),
-                      h.p(
-                        [classAttr(h, css(styles.stepNote))],
-                        [
-                          'Automatic mounting is upcoming on main; installed 0.1.0 projects still need this block.',
-                        ],
                       ),
                       h.div(
                         [classAttr(h, css(styles.snippetList))],
@@ -604,12 +654,6 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                         [classAttr(h, css(styles.stepText))],
                         [
                           'Inspect an element, leave a note, and review the Markdown or JSON handoff in Feedback before you copy or share it.',
-                        ],
-                      ),
-                      h.p(
-                        [classAttr(h, css(styles.stepNote))],
-                        [
-                          'Published 0.1.0 only includes source, Message, Model, and observed-update context when you explicitly register that scope. Review and consent to any Model data before sharing; automatic context is upcoming on main.',
                         ],
                       ),
                     ],

@@ -209,6 +209,27 @@ export const styles = stylex.create({
   code: {
     display: 'block',
   },
+  codeComment: {
+    color: '#57606a',
+  },
+  codeKeyword: {
+    color: '#cf222e',
+  },
+  codeString: {
+    color: '#0a3069',
+  },
+  codeProperty: {
+    color: '#0550ae',
+  },
+  codeFunction: {
+    color: '#8250df',
+  },
+  codeBuiltin: {
+    color: '#953800',
+  },
+  codePunctuation: {
+    color: '#57606a',
+  },
   copyFeedback: {
     margin: '0 12px 12px',
     fontSize: '13px',
