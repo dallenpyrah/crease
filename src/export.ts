@@ -31,14 +31,36 @@ const formatAnnotation = (annotation: Annotation, index: number): string => {
     ...(annotation.foldkit === undefined
       ? []
       : [
-          `**FoldKit scope:** ${annotation.foldkit.boundary} (explicit registration)`,
-          `**Source:** ${annotation.foldkit.source.file}${annotation.foldkit.source.line === undefined ? '' : `:${annotation.foldkit.source.line}`} → ${annotation.foldkit.source.view}`,
+          `**FoldKit scope:** ${annotation.foldkit.boundary} (${annotation.foldkit.provenance === 'automatic-instrumentation' ? 'automatic instrumentation' : 'explicit registration'})`,
+          `**Source:** ${annotation.foldkit.source.file}${annotation.foldkit.source.line === undefined ? '' : `:${annotation.foldkit.source.line}`}${annotation.foldkit.source.column === undefined ? '' : `:${annotation.foldkit.source.column}`} → ${annotation.foldkit.source.view}`,
+          ...(annotation.foldkit.elementSource === undefined
+            ? []
+            : [
+                `**Element source:** ${annotation.foldkit.elementSource.file}:${annotation.foldkit.elementSource.line}:${annotation.foldkit.elementSource.column}`,
+              ]),
+          ...(annotation.foldkit.modelSource === undefined
+            ? []
+            : [
+                `**Model supplied:** ${annotation.foldkit.modelSource.expression} (${annotation.foldkit.modelSource.file}:${annotation.foldkit.modelSource.line}:${annotation.foldkit.modelSource.column})`,
+                ...(annotation.foldkit.modelSource.definition === undefined
+                  ? []
+                  : [
+                      `**Model declaration:** ${annotation.foldkit.modelSource.definition.view} (${annotation.foldkit.modelSource.definition.file}:${annotation.foldkit.modelSource.definition.line}:${annotation.foldkit.modelSource.definition.column})`,
+                    ]),
+              ]),
+          ...(annotation.foldkit.availability?.map(
+            (reason) => `**Context limit:** ${reason}`,
+          ) ?? []),
           `**Messages:** ${annotation.foldkit.events.map((event) => `${event.event} → ${event.message}`).join('; ') || 'No static event registered'}`,
           ...(annotation.foldkit.model === undefined
             ? []
             : [
                 `**Scoped Model (opt-in capture):** ${JSON.stringify(annotation.foldkit.model)}`,
-                '**Observed scope updates (not inferred element-to-Command causality):**',
+                ...(annotation.foldkit.history === undefined
+                  ? []
+                  : [
+                      '**Observed scope updates (not inferred element-to-Command causality):**',
+                    ]),
                 ...(annotation.foldkit.history?.map(
                   (change) =>
                     `- ${change.message}: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`,

@@ -39,7 +39,7 @@ For an overlay or interaction change, also inspect the demo in a browser at desk
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Public package API                                       | [`src/index.ts`](../src/index.ts)                                                                                                                           |
 | Overlay controls, annotations, and self-contained styles | [`src/creasekit.ts`](../src/creasekit.ts), [`src/overlay-styles.ts`](../src/overlay-styles.ts)                                                              |
-| Development mount and demo registration                  | [`src/entry.ts`](../src/entry.ts), [`src/development.ts`](../src/development.ts)                                                                            |
+| Automatic development mount and context                  | [`src/automatic-entry.ts`](../src/automatic-entry.ts), [`src/automatic-context.ts`](../src/automatic-context.ts)                                            |
 | Explicit FoldKit context and observation wrappers        | [`src/foldkit-context.ts`](../src/foldkit-context.ts)                                                                                                       |
 | Browser-to-local transport connection                    | [`src/agent-connection.ts`](../src/agent-connection.ts)                                                                                                     |
 | Public Vite plugin and local session protection          | [`server/vite-plugin.ts`](../server/vite-plugin.ts), [`server/bridge.ts`](../server/bridge.ts)                                                              |
@@ -51,7 +51,7 @@ For an overlay or interaction change, also inspect the demo in a browser at desk
 
 The library is an observer and overlay, not part of the host application's Model. `observeUpdate` and `observeView` must return the host update and view results unchanged. Keep pointer measurements and overlay state outside the host update loop, do not alter VNode identity, and never dispatch application Messages on an agent's behalf.
 
-Source, Message metadata, and Model values require explicit registrations. Do not imply that a DOM selector proves source ownership or that an observed update proves element-to-Message causality. Use project-relative source paths, stable selectors, and a narrow state projection. See [Register FoldKit context](FOLDKIT.md) for the public integration contract.
+The unreleased 0.2.0 integration captures source, declared events, and rendered-scope Model context through development-only instrumentation. Preserve original source coordinates and runtime/instance ownership; omit metadata when ownership cannot be verified. Do not imply that a DOM selector proves source ownership or that an observed update proves element-to-Message causality. See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for the new integration and [Register FoldKit context](FOLDKIT.md) for the supported explicit adapter.
 
 ## Preserve the sharing boundary
 
@@ -61,7 +61,7 @@ Keep credentials out of browser data, logs, exports, and client configuration. P
 
 ## Package and release work
 
-The package build produces `dist`; the demo build produces `dist-site`. Keep consumer-facing exports limited to the documented public API and verify the packed package with `npm run test:package` when changing packaging, exports, or the CLI.
+The package build produces `dist`; the demo build produces `dist-site`. The CLI bundles its locked Effect and Node adapter dependencies to avoid mixing incompatible prerelease runtimes during a fresh install. Keep consumer-facing exports limited to the documented public API and verify the packed package with `npm run test:package` when changing packaging, exports, or the CLI.
 
 Publishing is tag-triggered and uses `NPM_TOKEN` in GitHub Actions. A tag and workflow configuration are not proof of a completed publication: verify the workflow result and the registry before announcing a release.
 
@@ -71,7 +71,7 @@ Connect Railway to `dallenpyrah/creasekit` on `main`, using the repository root.
 
 The Dockerfile installs the locked dependencies and runs `npm run build:site`. The runtime image contains Caddy and `dist-site` only. Caddy listens on all interfaces at Railway's assigned `PORT` (or port 8080 locally). Railway handles HTTPS.
 
-The public demo retains the visual feedback overlay, but the development-only FoldKit registration and MCP connection are excluded. It does not run Vite, the local MCP bridge, or the CLI. MCP sharing still requires a local consuming application with the plugin enabled.
+The public demo retains the visual feedback overlay, but automatic FoldKit instrumentation and the MCP connection are excluded. It does not run Vite, the local MCP bridge, or the CLI. MCP sharing still requires a local consuming application with the plugin enabled.
 
 To test the same container locally:
 

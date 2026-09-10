@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Runtime, type Update } from 'foldkit';
+import * as Command from 'foldkit/command';
 import { Document, HtmlBuilder } from 'foldkit/html';
 import { defineMessageUnion } from 'foldkit/message';
-import { evo } from 'foldkit/struct';
 
 import metadata from '../package.json' with { type: 'json' };
 import creasekitLogo from './assets/creasekit.svg';
@@ -27,12 +27,29 @@ type FeatureIcon =
   | 'resolve'
   | 'settings';
 
-type CardIcon = 'playground' | 'foldkit';
-
 type Feature = Readonly<{
   icon: FeatureIcon;
   name: string;
   description: string;
+}>;
+
+const SnippetId = Schema.Literals([
+  'install-npm',
+  'install-bun',
+  'ignore-creasekit',
+  'vite-config',
+  'development-mount',
+  'start-app',
+  'mcp-config',
+]);
+type SnippetId = typeof SnippetId.Type;
+
+type SetupSnippet = Readonly<{
+  id: SnippetId;
+  filename: string;
+  language: string;
+  copyLabel: string;
+  code: string;
 }>;
 
 const className = (...values: Array<string | false | null | undefined>): string =>
@@ -141,33 +158,6 @@ const featureIcon = (h: HtmlBuilder<Message>, name: FeatureIcon) => {
   }
 };
 
-const cardIcon = (h: HtmlBuilder<Message>, name: CardIcon) => {
-  const attributes = [
-    classAttr(h, css(styles.cardIcon)),
-    h.ViewBox('0 0 24 24'),
-    h.Width('24'),
-    h.Height('24'),
-    h.Fill('none'),
-    h.Stroke('currentColor'),
-    h.StrokeWidth('1.8'),
-    h.StrokeLinecap('round'),
-    h.StrokeLinejoin('round'),
-    h.AriaHidden(true),
-  ];
-
-  if (name === 'playground') {
-    return h.svg(attributes, [
-      h.circle([h.Cx('12'), h.Cy('12'), h.R('8')]),
-      h.path([h.D('m10 8 6 4-6 4V8Z')]),
-    ]);
-  }
-
-  return h.svg(attributes, [
-    h.path([h.D('M5 3h14v18H5V3Z')]),
-    h.path([h.D('M9 8h6M9 12h6M9 16h4')]),
-  ]);
-};
-
 const features: ReadonlyArray<Feature> = [
   {
     icon: 'toggle',
@@ -251,32 +241,136 @@ const features: ReadonlyArray<Feature> = [
   },
 ];
 
-export const Model = Schema.Struct({ playgroundCount: Schema.Number });
+const setupSnippets: ReadonlyArray<SetupSnippet> = [
+  {
+    id: 'install-npm',
+    filename: 'Terminal',
+    language: 'npm',
+    copyLabel: 'npm install command',
+    code: 'npm install -D creasekit',
+  },
+  {
+    id: 'install-bun',
+    filename: 'Terminal',
+    language: 'Bun',
+    copyLabel: 'Bun install command',
+    code: 'bun add -D creasekit',
+  },
+  {
+    id: 'ignore-creasekit',
+    filename: '.gitignore',
+    language: 'gitignore',
+    copyLabel: '.creasekit ignore rule',
+    code: '.creasekit/',
+  },
+  {
+    id: 'vite-config',
+    filename: 'vite.config.ts',
+    language: 'TypeScript',
+    copyLabel: 'Vite configuration',
+    code: [
+      "import { foldkit } from '@foldkit/vite-plugin';",
+      "import { creasekit } from 'creasekit/vite';",
+      "import { defineConfig } from 'vite';",
+      '',
+      'export default defineConfig({',
+      '  plugins: [foldkit(), creasekit()],',
+      "  server: { host: '127.0.0.1' },",
+      '});',
+    ].join('\n'),
+  },
+  {
+    id: 'development-mount',
+    filename: 'src/entry.ts',
+    language: 'TypeScript',
+    copyLabel: 'development mount block',
+    code: [
+      'if (import.meta.env.DEV) {',
+      "  const { createAgentConnection, mountCreasekit } = await import('creasekit');",
+      '  const creasekit = mountCreasekit({',
+      "    projectId: 'my-app',",
+      '    agent: createAgentConnection(),',
+      '  });',
+      '',
+      '  if (import.meta.hot) {',
+      '    import.meta.hot.dispose(() => creasekit.destroy());',
+      '  }',
+      '}',
+    ].join('\n'),
+  },
+  {
+    id: 'start-app',
+    filename: 'Terminal',
+    language: 'npm',
+    copyLabel: 'development command',
+    code: 'npm run dev',
+  },
+  {
+    id: 'mcp-config',
+    filename: 'mcp.json',
+    language: 'JSON',
+    copyLabel: 'MCP configuration',
+    code: [
+      '{',
+      '  "mcpServers": {',
+      '    "creasekit": {',
+      '      "command": "bun",',
+      '      "args": ["x", "creasekit", "--cwd", "/absolute/path/to/foldkit-app"]',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n'),
+  },
+];
+
+const setupSnippet = (id: SnippetId): SetupSnippet => {
+  const snippet = setupSnippets.find((candidate) => candidate.id === id);
+  if (snippet === undefined) throw new Error(`Unknown setup snippet: ${id}`);
+  return snippet;
+};
+
+const CopyStatus = Schema.Struct({
+  snippet: SnippetId,
+  outcome: Schema.Literals(['copied', 'failed']),
+});
+
+export const Model = Schema.Struct({ copyStatus: Schema.NullOr(CopyStatus) });
 export type Model = typeof Model.Type;
 
 export const Message = defineMessageUnion({
-  ClickedDecrement: {},
-  ClickedIncrement: {},
-  ClickedReset: {},
+  ClickedCopySetupSnippet: { snippet: SnippetId },
+  CopiedSetupSnippet: { snippet: SnippetId },
+  FailedToCopySetupSnippet: { snippet: SnippetId },
 });
 export type Message = typeof Message.Type;
 
+export const CopySetupSnippet = Command.define('CopySetupSnippet', {
+  args: { snippet: SnippetId },
+  messages: [Message.CopiedSetupSnippet, Message.FailedToCopySetupSnippet],
+  execute: ({ snippet }) =>
+    Effect.tryPromise(() =>
+      navigator.clipboard.writeText(setupSnippet(snippet).code),
+    ).pipe(
+      Effect.as(Message.CopiedSetupSnippet({ snippet })),
+      Effect.catch(() => Effect.succeed(Message.FailedToCopySetupSnippet({ snippet }))),
+    ),
+});
+
 export const init: Runtime.ApplicationInit<Model, Message> = () => ({
-  model: { playgroundCount: 0 },
+  model: { copyStatus: null },
 });
 
 export const update = (model: Model, message: Message) =>
   Message.match<Update.Return<Model, Message>>(message, {
-    ClickedDecrement: () => ({
-      model: evo(model, {
-        playgroundCount: (count) => Math.max(0, count - 1),
-      }),
+    ClickedCopySetupSnippet: ({ snippet }) => ({
+      model: { copyStatus: null },
+      commands: [CopySetupSnippet({ snippet })],
     }),
-    ClickedIncrement: () => ({
-      model: evo(model, { playgroundCount: (count) => count + 1 }),
+    CopiedSetupSnippet: ({ snippet }) => ({
+      model: { copyStatus: { snippet, outcome: 'copied' } },
     }),
-    ClickedReset: () => ({
-      model: evo(model, { playgroundCount: () => 0 }),
+    FailedToCopySetupSnippet: ({ snippet }) => ({
+      model: { copyStatus: { snippet, outcome: 'failed' } },
     }),
   });
 
@@ -297,6 +391,71 @@ const featureRow = (h: HtmlBuilder<Message>, feature: Feature) =>
       ),
     ],
   );
+
+const copyFeedback = (model: Model, snippet: SetupSnippet): string | undefined => {
+  if (model.copyStatus?.snippet !== snippet.id) return undefined;
+  return model.copyStatus.outcome === 'copied'
+    ? 'Copied to clipboard.'
+    : 'Clipboard access was denied or is unavailable. Select this code and copy it manually.';
+};
+
+const snippetBlock = (h: HtmlBuilder<Message>, model: Model, snippet: SetupSnippet) => {
+  const feedback = copyFeedback(model, snippet);
+  const copied =
+    model.copyStatus?.snippet === snippet.id && model.copyStatus.outcome === 'copied';
+
+  return h.div(
+    [classAttr(h, css(styles.codeExample))],
+    [
+      h.div(
+        [classAttr(h, css(styles.codeHeader))],
+        [
+          h.div(
+            [classAttr(h, css(styles.codeLabel))],
+            [
+              h.span([classAttr(h, css(styles.codeFilename))], [snippet.filename]),
+              h.span([classAttr(h, css(styles.codeLanguage))], [snippet.language]),
+            ],
+          ),
+          h.button(
+            [
+              classAttr(h, css(styles.copyButton)),
+              h.Type('button'),
+              h.AriaLabel(`Copy ${snippet.copyLabel}`),
+              h.OnClick(Message.ClickedCopySetupSnippet({ snippet: snippet.id })),
+            ],
+            [copied ? 'Copied' : 'Copy'],
+          ),
+        ],
+      ),
+      h.pre(
+        [classAttr(h, css(styles.codeBlock))],
+        [h.code([classAttr(h, css(styles.code))], [snippet.code])],
+      ),
+      ...(feedback === undefined
+        ? []
+        : [
+            h.p(
+              [
+                classAttr(
+                  h,
+                  css(
+                    styles.copyFeedback,
+                    model.copyStatus?.outcome === 'failed'
+                      ? styles.copyFeedbackFailure
+                      : styles.copyFeedbackSuccess,
+                  ),
+                ),
+                h.Role('status'),
+                h.AriaLive('polite'),
+                h.AriaAtomic(true),
+              ],
+              [feedback],
+            ),
+          ]),
+    ],
+  );
+};
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: 'creasekit — visual feedback for FoldKit',
@@ -349,144 +508,135 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
             [classAttr(h, css(styles.howSection))],
             [
               h.h2([classAttr(h, css(styles.sectionTitle))], ['How to use']),
-              h.div(
-                [classAttr(h, css(styles.howCards), 'creasekit-home-cards')],
+              h.ol(
+                [classAttr(h, css(styles.setupList))],
                 [
-                  h.article(
-                    [classAttr(h, css(styles.howCard))],
+                  h.li(
+                    [classAttr(h, css(styles.setupStep))],
                     [
-                      cardIcon(h, 'playground'),
-                      h.h3([classAttr(h, css(styles.cardTitle))], ['Live playground']),
+                      h.h3(
+                        [classAttr(h, css(styles.stepTitle))],
+                        ['Install creasekit'],
+                      ),
                       h.p(
-                        [classAttr(h, css(styles.cardText))],
+                        [classAttr(h, css(styles.stepText))],
                         [
-                          'Use the counter below as a real FoldKit surface to inspect and annotate.',
+                          'Use Node.js 22.12 or later. From the root of your existing FoldKit application, install creasekit as a development dependency.',
                         ],
                       ),
-                      h.a(
-                        [classAttr(h, css(styles.cardLink)), h.Href('#playground')],
-                        ['Try the playground'],
+                      h.div(
+                        [classAttr(h, css(styles.snippetList))],
+                        [
+                          snippetBlock(h, model, setupSnippet('install-npm')),
+                          snippetBlock(h, model, setupSnippet('install-bun')),
+                        ],
                       ),
                     ],
                   ),
-                  h.article(
-                    [classAttr(h, css(styles.howCard))],
+                  h.li(
+                    [classAttr(h, css(styles.setupStep))],
                     [
-                      cardIcon(h, 'foldkit'),
-                      h.h3([classAttr(h, css(styles.cardTitle))], ['FoldKit setup']),
+                      h.h3([classAttr(h, css(styles.stepTitle))], ['Configure Vite']),
                       h.p(
-                        [classAttr(h, css(styles.cardText))],
+                        [classAttr(h, css(styles.stepText))],
                         [
-                          'Mount the local overlay from the same FoldKit project while you develop.',
+                          'Ignore creasekit’s local session directory, then add creasekit after foldkit and keep the Vite development server on loopback HTTP.',
                         ],
                       ),
-                      h.pre(
-                        [classAttr(h, css(styles.setupCode))],
+                      h.div(
+                        [classAttr(h, css(styles.snippetList))],
                         [
-                          h.code(
-                            [],
-                            [
-                              "import { mountCreasekit } from 'creasekit'\nmountCreasekit({ projectId: 'my-app' })",
-                            ],
-                          ),
+                          snippetBlock(h, model, setupSnippet('ignore-creasekit')),
+                          snippetBlock(h, model, setupSnippet('vite-config')),
                         ],
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          h.section(
-            [classAttr(h, css(styles.playgroundSection)), h.Id('playground')],
-            [
-              h.h2([classAttr(h, css(styles.sectionTitle))], ['Live playground']),
-              h.p(
-                [classAttr(h, css(styles.playgroundLead))],
-                [
-                  'Toggle creasekit off to try the counter. Turn it back on to inspect or annotate this live FoldKit view.',
-                ],
-              ),
-              h.div(
-                [
-                  classAttr(h, css(styles.playground), 'creasekit-home-playground'),
-                  h.DataAttribute('creasekit-target', 'playground'),
-                ],
-                [
-                  h.div(
-                    [h.DataAttribute('creasekit-target', 'playground-counter')],
-                    [
                       h.p(
-                        [classAttr(h, css(styles.playgroundLabel))],
-                        ['Counter value'],
-                      ),
-                      h.output(
+                        [classAttr(h, css(styles.stepNote))],
                         [
-                          classAttr(h, css(styles.playgroundValue)),
-                          h.DataAttribute('creasekit-target', 'playground-value'),
-                          h.AriaLabel('Counter value'),
-                          h.AriaLive('polite'),
+                          'Do not expose this server over a network, tunnel, or HTTPS connection. MCP sharing is intentionally local-only.',
                         ],
-                        [`${model.playgroundCount}`],
                       ),
                     ],
                   ),
-                  h.div(
+                  h.li(
+                    [classAttr(h, css(styles.setupStep))],
                     [
-                      classAttr(
-                        h,
-                        css(styles.playgroundControls),
-                        'creasekit-home-playground-controls',
+                      h.h3(
+                        [classAttr(h, css(styles.stepTitle))],
+                        ['Mount and start in development'],
                       ),
-                    ],
-                    [
-                      h.button(
+                      h.p(
+                        [classAttr(h, css(styles.stepText))],
                         [
-                          classAttr(
-                            h,
-                            css(
-                              styles.playgroundButton,
-                              styles.playgroundButtonSecondary,
-                            ),
-                          ),
-                          h.Type('button'),
-                          h.DataAttribute('creasekit-target', 'playground-decrement'),
-                          h.AriaLabel('Decrease counter'),
-                          h.OnClick(Message.ClickedDecrement()),
+                          'Released 0.1.0 does not mount the overlay automatically. Add this development-only block after your existing Runtime.run(application) call.',
                         ],
-                        ['−'],
                       ),
-                      h.button(
-                        [
-                          classAttr(h, css(styles.playgroundButton)),
-                          h.Type('button'),
-                          h.DataAttribute('creasekit-target', 'playground-increment'),
-                          h.AriaLabel('Increase counter'),
-                          h.OnClick(Message.ClickedIncrement()),
-                        ],
-                        ['+'],
+                      h.div(
+                        [classAttr(h, css(styles.snippetList))],
+                        [snippetBlock(h, model, setupSnippet('development-mount'))],
                       ),
-                      h.button(
+                      h.p(
+                        [classAttr(h, css(styles.stepNote))],
                         [
-                          classAttr(
-                            h,
-                            css(
-                              styles.playgroundButton,
-                              styles.playgroundButtonSecondary,
-                            ),
-                          ),
-                          h.Type('button'),
-                          h.DataAttribute('creasekit-target', 'playground-reset'),
-                          h.OnClick(Message.ClickedReset()),
+                          'Automatic mounting is upcoming on main; installed 0.1.0 projects still need this block.',
                         ],
-                        ['Reset'],
+                      ),
+                      h.div(
+                        [classAttr(h, css(styles.snippetList))],
+                        [snippetBlock(h, model, setupSnippet('start-app'))],
+                      ),
+                      h.p(
+                        [classAttr(h, css(styles.stepText))],
+                        [
+                          'Open your application’s Vite URL, then click the creasekit mark or press Alt+Shift+C to open the toolbar.',
+                        ],
                       ),
                     ],
                   ),
-                  h.p(
-                    [classAttr(h, css(styles.playgroundHint))],
+                  h.li(
+                    [classAttr(h, css(styles.setupStep))],
                     [
-                      'The mounted toolbar can select these controls and capture their element context.',
+                      h.h3(
+                        [classAttr(h, css(styles.stepTitle))],
+                        ['Annotate and review context'],
+                      ),
+                      h.p(
+                        [classAttr(h, css(styles.stepText))],
+                        [
+                          'Inspect an element, leave a note, and review the Markdown or JSON handoff in Feedback before you copy or share it.',
+                        ],
+                      ),
+                      h.p(
+                        [classAttr(h, css(styles.stepNote))],
+                        [
+                          'Published 0.1.0 only includes source, Message, Model, and observed-update context when you explicitly register that scope. Review and consent to any Model data before sharing; automatic context is upcoming on main.',
+                        ],
+                      ),
+                    ],
+                  ),
+                  h.li(
+                    [classAttr(h, css(styles.setupStep))],
+                    [
+                      h.h3(
+                        [classAttr(h, css(styles.stepTitle))],
+                        ['Connect an agent (optional)'],
+                      ),
+                      h.p(
+                        [classAttr(h, css(styles.stepText))],
+                        [
+                          'After the Vite server starts, configure your MCP client to run the local stdio server from the consuming application’s configured Vite root.',
+                        ],
+                      ),
+                      h.div(
+                        [classAttr(h, css(styles.snippetList))],
+                        [snippetBlock(h, model, setupSnippet('mcp-config'))],
+                      ),
+                      h.p(
+                        [classAttr(h, css(styles.stepNote))],
+                        [
+                          'The --cwd directory contains .creasekit/mcp-session.json. Choose Share snapshot only after reviewing the read-only snapshot, and choose Stop sharing to revoke the current one.',
+                        ],
+                      ),
                     ],
                   ),
                 ],

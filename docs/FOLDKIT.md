@@ -1,5 +1,7 @@
 # Register FoldKit context
 
+This explicit adapter remains the integration path for published 0.1.0 and an optional override for later versions. The unreleased 0.2.0 implementation on `main` adds [automatic source and scoped Model context](AUTOMATIC_CONTEXT.md) without application registrations.
+
 The creasekit overlay works without application registration. Add FoldKit context only when a selected element should expose developer-defined source context, event Message metadata, a narrow Model projection, or observed updates.
 
 creasekit does not infer source ownership, event handling, or arbitrary Model values from rendered HTML. That boundary is intentional: source context is explicit developer metadata, not discovered provenance.

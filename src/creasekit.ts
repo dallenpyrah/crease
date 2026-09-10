@@ -4,7 +4,11 @@ import type { AgentConnection, AgentSnapshot } from './agent-contract.js';
 import { type Annotation, makeAnnotation, redactedPageUrl } from './domain.js';
 import { formatJson, formatMarkdown } from './export.js';
 import * as Feedback from './feedback.js';
-import { type FoldkitInspector, withoutModel } from './foldkit-context.js';
+import {
+  type FoldkitInspector,
+  getDefaultFoldkitInspector,
+  withoutModel,
+} from './foldkit-context.js';
 import {
   isInspectable,
   selectorFor,
@@ -72,7 +76,26 @@ const tool = (action: string, name: IconName, label: string): string =>
 const actionButton = (action: string, name: IconName, label: string): string =>
   `<button type="button" class="creasekit-action" data-action="${action}">${icon(name)}${label}</button>`;
 
+const mounts = new WeakMap<
+  HTMLElement,
+  {
+    readonly handle: CreasekitHandle;
+    readonly host: HTMLElement;
+    readonly configure: (options: CreasekitOptions) => void;
+  }
+>();
+
 export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle => {
+  const target = options.target ?? document.body;
+  const existing = mounts.get(target);
+  if (existing !== undefined && existing.host.isConnected) {
+    existing.configure(options);
+    return existing.handle;
+  }
+  existing?.handle.destroy();
+  const defaultInspector = getDefaultFoldkitInspector();
+  if (options.foldkit === undefined && defaultInspector !== undefined)
+    options = { ...options, foldkit: defaultInspector };
   const host = document.createElement('div');
   host.setAttribute('data-creasekit-root', '');
   host.setAttribute('aria-label', 'creasekit visual feedback tools');
@@ -145,7 +168,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           <label class="creasekit-setting">Show annotation pins<input type="checkbox" data-setting="pins" checked></label>
           <label class="creasekit-setting">Viewport rulers<input type="checkbox" data-setting="rulers"></label>
           <label class="creasekit-setting creasekit-model-setting" hidden>Include scoped Model & history<input type="checkbox" data-setting="model"></label>
-          <p class="creasekit-subtitle creasekit-model-setting" hidden>Only developer-registered fields are included. Model values stay out of local storage.</p>
+          <p class="creasekit-subtitle creasekit-model-setting" hidden>Only scoped, sanitized Model fields are included. Model values stay out of local storage.</p>
           <p class="creasekit-subtitle">Notes persist locally. Visual settings apply to this session.</p>
           <div class="creasekit-shortcuts"><span>Toggle creasekit</span><kbd>⌥ ⇧ C</kbd><span>Inspect / annotate</span><span><kbd>I</kbd> <kbd>N</kbd></span><span>Typography / color</span><span><kbd>A</kbd> <kbd>P</kbd></span><span>X-ray / rulers</span><span><kbd>X</kbd> <kbd>R</kbd></span><span>Distance to selected element</span><kbd>hold ⌥</kbd><span>Undo / redo note change</span><span><kbd>⌘ Z</kbd> <kbd>⌘ ⇧ Z</kbd></span><span>Dismiss / exit</span><kbd>esc</kbd></div>
         </div>
@@ -351,7 +374,10 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         url.pathname !== window.location.pathname
       )
         return null;
-      return document.querySelector(annotation.target.selector);
+      if (annotation.foldkit?.provenance === 'automatic-instrumentation')
+        return options.foldkit?.resolve?.(annotation.foldkit) ?? null;
+      const matches = document.querySelectorAll(annotation.target.selector);
+      return matches.length === 1 ? (matches[0] ?? null) : null;
     } catch {
       return null;
     }
@@ -632,15 +658,34 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     }
     const heading = document.createElement('div');
     heading.className = 'creasekit-foldkit-heading';
-    heading.innerHTML = `${icon('creasekit')}<strong>FoldKit</strong><span>Registered context</span>`;
+    heading.innerHTML = `${icon('creasekit')}<strong>FoldKit</strong><span>${context.provenance === 'automatic-instrumentation' ? 'Automatic context' : 'Registered context'}</span>`;
     panel.append(heading);
     const source = document.createElement('button');
     source.className = 'creasekit-source';
     source.dataset.action = 'open-source';
-    source.dataset.source = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`}`;
-    source.textContent = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`} → ${context.source.view}`;
-    source.title = 'Open registered source in your editor';
+    source.dataset.source = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`}${context.source.column === undefined ? '' : `:${context.source.column}`}`;
+    source.textContent = `${source.dataset.source} → ${context.source.view}`;
+    source.title = 'Open view source in your editor';
     panel.append(source, row('Scope', context.boundary));
+    for (const [label, location] of [
+      ['Element source', context.elementSource],
+      ['Model declaration', context.modelSource?.definition],
+    ] as const) {
+      if (location === undefined) continue;
+      const link = document.createElement('button');
+      link.className = 'creasekit-source';
+      link.dataset.action = 'open-source';
+      link.dataset.source = `${location.file}:${location.line ?? 1}:${location.column ?? 1}`;
+      link.textContent = `${label}: ${link.dataset.source}`;
+      panel.append(link);
+    }
+    if (context.modelSource !== undefined)
+      panel.append(
+        row(
+          'Model supplied',
+          `${context.modelSource.expression} (${context.modelSource.file}:${context.modelSource.line}:${context.modelSource.column})`,
+        ),
+      );
     for (const event of context.events) panel.append(row(event.event, event.message));
     const consent = document.createElement('button');
     consent.className = 'creasekit-action creasekit-model-toggle';
@@ -655,11 +700,18 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     hint.textContent =
       'Opt-in fields may be captured in notes and shared snapshots. Model values are never saved to local storage.';
     panel.append(hint);
+    for (const reason of context.availability ?? []) {
+      const note = document.createElement('p');
+      note.className = 'creasekit-subtitle';
+      note.textContent = reason;
+      panel.append(note);
+    }
     if (context.model === undefined) return;
     const model = document.createElement('pre');
     model.className = 'creasekit-model-code';
     model.textContent = JSON.stringify(context.model, null, 2);
     panel.append(model);
+    if (context.history === undefined) return;
     const history = document.createElement('details');
     history.className = 'creasekit-context-history';
     history.open = historyOpen;
@@ -1236,15 +1288,17 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     },
     { signal: controller.signal },
   );
-  const unsubscribeContext = options.foldkit?.subscribe(() => scheduleVisual(true));
+  let unsubscribeContext = options.foldkit?.subscribe(() => scheduleVisual(true));
   render();
 
-  return {
+  const handle: CreasekitHandle = {
     open,
     close,
     showOutput,
     destroy: () => {
+      if (destroyed) return;
       destroyed = true;
+      mounts.delete(target);
       controller.abort();
       unsubscribeContext?.();
       if (state.shared) void options.agent?.unshare(runtimeId).catch(() => {});
@@ -1255,6 +1309,19 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       host.remove();
     },
   };
+  mounts.set(target, {
+    handle,
+    host,
+    configure: (next) => {
+      if (next.foldkit !== undefined && next.foldkit !== options.foldkit) {
+        unsubscribeContext?.();
+        unsubscribeContext = next.foldkit.subscribe(() => scheduleVisual(true));
+      }
+      options = { ...options, ...next };
+      render();
+    },
+  });
+  return handle;
 };
 
 export { selectorFor };

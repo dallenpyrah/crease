@@ -1,17 +1,18 @@
 import * as Scene from 'foldkit/scene';
 import { describe, it } from 'vitest';
 
-import { type Model, update, view } from './main';
+import { CopySetupSnippet, Message, type Model, update, view } from './main';
 
-const model = (playgroundCount = 0): Model => ({ playgroundCount });
+const model = (): Model => ({ copyStatus: null });
 
-const counterValue = Scene.role('status', { name: 'Counter value' });
-const decreaseCounter = Scene.role('button', { name: 'Decrease counter' });
-const increaseCounter = Scene.role('button', { name: 'Increase counter' });
-const resetCounter = Scene.role('button', { name: 'Reset' });
+const copyNpmInstall = Scene.role('button', { name: 'Copy npm install command' });
+const copyMcpConfiguration = Scene.role('button', { name: 'Copy MCP configuration' });
+const viteConfiguration = Scene.nth(Scene.all.selector('pre code'), 3);
+const developmentMount = Scene.nth(Scene.all.selector('pre code'), 4);
+const mcpConfiguration = Scene.nth(Scene.all.selector('pre code'), 6);
 
 describe('homepage view', () => {
-  it('renders the branded heading hierarchy', () => {
+  it('renders the branded heading hierarchy and numbered setup guide', () => {
     Scene.scene(
       { update, view },
       Scene.given(model()),
@@ -25,77 +26,125 @@ describe('homepage view', () => {
       Scene.expect(Scene.role('heading', { name: 'Features', level: 2 })).toExist(),
       Scene.expect(Scene.role('heading', { name: 'How to use', level: 2 })).toExist(),
       Scene.expect(
-        Scene.role('heading', { name: 'Live playground', level: 2 }),
+        Scene.role('heading', { name: 'Install creasekit', level: 3 }),
       ).toExist(),
+      Scene.expect(
+        Scene.role('heading', { name: 'Configure Vite', level: 3 }),
+      ).toExist(),
+      Scene.expect(
+        Scene.role('heading', { name: 'Mount and start in development', level: 3 }),
+      ).toExist(),
+      Scene.expect(
+        Scene.role('heading', { name: 'Annotate and review context', level: 3 }),
+      ).toExist(),
+      Scene.expect(
+        Scene.role('heading', { name: 'Connect an agent (optional)', level: 3 }),
+      ).toExist(),
+      Scene.expect(
+        Scene.role('heading', { name: 'Live playground', level: 2 }),
+      ).toBeAbsent(),
+      Scene.expect(Scene.role('link', { name: 'Try the playground' })).toBeAbsent(),
     );
   });
 
-  it('renders the feature list and playground link', () => {
+  it('renders complete labelled setup code without the playground', () => {
     Scene.scene(
       { update, view },
       Scene.given(model()),
-      Scene.expectAll(Scene.all.role('listitem')).toHaveCount(16),
-      Scene.expect(Scene.text('Toggle on/off')).toExist(),
-      Scene.expect(Scene.text('Settings')).toExist(),
-      Scene.expect(Scene.role('link', { name: 'Try the playground' })).toHaveAttr(
-        'href',
-        '#playground',
+      Scene.expectAll(Scene.all.role('listitem')).toHaveCount(21),
+      Scene.expectAll(Scene.all.selector('pre code')).toHaveCount(7),
+      Scene.expect(Scene.text('npm install -D creasekit')).toExist(),
+      Scene.expect(Scene.text('bun add -D creasekit')).toExist(),
+      Scene.expect(Scene.text('.creasekit/')).toExist(),
+      Scene.expect(Scene.text('vite.config.ts')).toExist(),
+      Scene.expect(Scene.text('TypeScript')).toExist(),
+      Scene.expect(viteConfiguration).toHaveText(
+        [
+          "import { foldkit } from '@foldkit/vite-plugin';",
+          "import { creasekit } from 'creasekit/vite';",
+          "import { defineConfig } from 'vite';",
+          '',
+          'export default defineConfig({',
+          '  plugins: [foldkit(), creasekit()],',
+          "  server: { host: '127.0.0.1' },",
+          '});',
+        ].join('\n'),
       ),
+      Scene.expect(developmentMount).toHaveText(
+        [
+          'if (import.meta.env.DEV) {',
+          "  const { createAgentConnection, mountCreasekit } = await import('creasekit');",
+          '  const creasekit = mountCreasekit({',
+          "    projectId: 'my-app',",
+          '    agent: createAgentConnection(),',
+          '  });',
+          '',
+          '  if (import.meta.hot) {',
+          '    import.meta.hot.dispose(() => creasekit.destroy());',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+      Scene.expect(
+        Scene.text(
+          'Automatic mounting is upcoming on main; installed 0.1.0 projects still need this block.',
+        ),
+      ).toExist(),
+      Scene.expect(
+        Scene.text(
+          'The --cwd directory contains .creasekit/mcp-session.json. Choose Share snapshot only after reviewing the read-only snapshot, and choose Stop sharing to revoke the current one.',
+        ),
+      ).toExist(),
+      Scene.expect(Scene.role('status')).toBeAbsent(),
     );
   });
 
-  it('exposes the initial counter through accessible controls and output', () => {
+  it('shows copied only after the matching clipboard command resolves', () => {
     Scene.scene(
       { update, view },
       Scene.given(model()),
-      Scene.expect(counterValue).toHaveAccessibleName('Counter value'),
-      Scene.expect(counterValue).toHaveAttr('aria-live', 'polite'),
-      Scene.expect(counterValue).toHaveText('0'),
-      Scene.expect(decreaseCounter).toBeEnabled(),
-      Scene.expect(increaseCounter).toBeEnabled(),
-      Scene.expect(resetCounter).toBeEnabled(),
-    );
-  });
-
-  it('updates the rendered output for repeated increments', () => {
-    Scene.scene(
-      { update, view },
-      Scene.given(model()),
-      Scene.click(increaseCounter),
+      Scene.expect(copyNpmInstall).toBeEnabled(),
+      Scene.click(copyNpmInstall),
       Scene.expectHandled(),
-      Scene.expect(counterValue).toHaveText('1'),
-      Scene.click(increaseCounter),
-      Scene.expectHandled(),
-      Scene.expect(counterValue).toHaveText('2'),
+      Scene.expect(copyNpmInstall).toHaveText('Copy'),
+      Scene.expect(Scene.role('status')).toBeAbsent(),
+      Scene.Command.expectExact(CopySetupSnippet({ snippet: 'install-npm' })),
+      Scene.Command.resolve(
+        CopySetupSnippet({ snippet: 'install-npm' }),
+        Message.CopiedSetupSnippet({ snippet: 'install-npm' }),
+      ),
+      Scene.expect(copyNpmInstall).toHaveText('Copied'),
+      Scene.expect(Scene.role('status')).toHaveText('Copied to clipboard.'),
       Scene.Command.expectNone(),
     );
   });
 
-  it('keeps the rendered output at zero when decremented', () => {
+  it('keeps the exact code selectable and reports copy failures honestly', () => {
     Scene.scene(
       { update, view },
       Scene.given(model()),
-      Scene.click(decreaseCounter),
+      Scene.expect(copyMcpConfiguration).toBeEnabled(),
+      Scene.click(copyMcpConfiguration),
       Scene.expectHandled(),
-      Scene.expect(counterValue).toHaveText('0'),
-      Scene.Command.expectNone(),
-    );
-  });
-
-  it('resets the rendered output and leaves a zero reset unchanged', () => {
-    Scene.scene(
-      { update, view },
-      Scene.given(model()),
-      Scene.click(increaseCounter),
-      Scene.expectHandled(),
-      Scene.click(increaseCounter),
-      Scene.expectHandled(),
-      Scene.click(resetCounter),
-      Scene.expectHandled(),
-      Scene.expect(counterValue).toHaveText('0'),
-      Scene.click(resetCounter),
-      Scene.expectHandled(),
-      Scene.expect(counterValue).toHaveText('0'),
+      Scene.Command.resolve(
+        CopySetupSnippet({ snippet: 'mcp-config' }),
+        Message.FailedToCopySetupSnippet({ snippet: 'mcp-config' }),
+      ),
+      Scene.expect(Scene.role('status')).toHaveText(
+        'Clipboard access was denied or is unavailable. Select this code and copy it manually.',
+      ),
+      Scene.expect(mcpConfiguration).toHaveText(
+        [
+          '{',
+          '  "mcpServers": {',
+          '    "creasekit": {',
+          '      "command": "bun",',
+          '      "args": ["x", "creasekit", "--cwd", "/absolute/path/to/foldkit-app"]',
+          '    }',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
       Scene.Command.expectNone(),
     );
   });

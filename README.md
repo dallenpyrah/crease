@@ -4,6 +4,8 @@
 
 Visual feedback and read-only MCP context for FoldKit applications. Mount the overlay in your existing Vite app to inspect elements, leave notes, and share an intentional snapshot with a coding agent.
 
+> **Release status:** `main` contains the unreleased 0.2.0 automatic integration. npm currently provides 0.1.0, whose setup is documented below. For the one-plugin workflow from a local package build, see [Automatic FoldKit context](docs/AUTOMATIC_CONTEXT.md). Do not mix an older MCP launcher with a newer package's automatic snapshots.
+
 ## Add creasekit to an existing app
 
 Use an existing FoldKit application with Vite. creasekit requires Node.js 22.12 or later. From the **consuming application's root**—not this repository or a package directory—install it as a development dependency:

@@ -39,7 +39,7 @@ test(
           const paths = tarball.files.map((file) => file.path);
           for (const path of paths) {
             assert(
-              /^(package\.json|README\.md|LICENSE|dist\/(index|vite|cli)\.js|dist\/types\/.+\.d\.ts)$/.test(
+              /^(package\.json|README\.md|LICENSE|dist\/(index|vite|cli|automatic)\.js|dist\/chunks\/[\w-]+\.js|dist\/types\/.+\.d\.ts)$/.test(
                 path,
               ),
               `Unexpected package file: ${path}`,
@@ -49,6 +49,7 @@ test(
             'dist/index.js',
             'dist/vite.js',
             'dist/cli.js',
+            'dist/automatic.js',
             'dist/types/src/index.d.ts',
             'dist/types/server/vite-plugin.d.ts',
           ])
@@ -57,7 +58,15 @@ test(
             tarball.files.find((file) => file.path === 'dist/cli.js').mode & 0o111,
             0o111,
           );
-          const browser = await readFile(join(root, 'dist/index.js'), 'utf8');
+          const browser = (
+            await Promise.all(
+              paths
+                .filter(
+                  (path) => path === 'dist/index.js' || path.startsWith('dist/chunks/'),
+                )
+                .map((path) => readFile(join(root, path), 'utf8')),
+            )
+          ).join('\n');
           assert.match(browser, /data:image\/svg\+xml/);
           assert.doesNotMatch(
             browser,
@@ -132,7 +141,13 @@ test(
       await t.test(
         'runs the binary through npm and bun without Vite, FoldKit, or tsx installed',
         async () => {
-          for (const dependency of ['vite', 'foldkit', 'tsx', '@stylexjs'])
+          for (const dependency of [
+            'vite',
+            'foldkit',
+            'tsx',
+            '@stylexjs',
+            '@effect/platform-node',
+          ])
             await assert.rejects(stat(join(launcher, 'node_modules', dependency)), {
               code: 'ENOENT',
             });
@@ -157,6 +172,38 @@ test(
       await server.listen();
       const address = server.httpServer.address();
       const origin = `http://127.0.0.1:${address.port}`;
+      await t.test(
+        'serves the automatic entry and instruments consumer source',
+        async () => {
+          const html = await (await fetch(origin)).text();
+          const proxies = [...html.matchAll(/src="([^"]*html-proxy[^"]*)"/g)].map(
+            (match) => match[1],
+          );
+          const modules = await Promise.all(
+            proxies.map((path) =>
+              fetch(new URL(path.replaceAll('&amp;', '&'), origin)).then((response) =>
+                response.text(),
+              ),
+            ),
+          );
+          assert.match([html, ...modules].join('\n'), /creasekit-runtime/);
+          const main = await server.transformRequest('/src/main.ts');
+          assert(main);
+          assert.match(main.code, /virtual:creasekit-runtime/);
+          assert.match(main.code, /captureCall/);
+          await writeFile(
+            join(app, 'src/automatic-entry.ts'),
+            `import { Runtime } from 'foldkit';\nimport { Model, init, update, view } from './main';\nRuntime.run(Runtime.makeApplication({ Model, init, update, view, container: document.getElementById('root') }));\n`,
+          );
+          const entry = await server.transformRequest('/src/automatic-entry.ts');
+          assert(entry);
+          assert.match(entry.code, /observeRuntime/);
+          const runtime = await server.transformRequest('virtual:creasekit-runtime');
+          assert(runtime);
+          assert.match(runtime.code, /automatic\.js/);
+          assert.doesNotMatch(runtime.code, /mcp-session|token/);
+        },
+      );
       for (let attempt = 0; ; attempt += 1) {
         try {
           await stat(join(app, '.creasekit/mcp-session.json'));

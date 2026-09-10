@@ -1,7 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { Schema } from 'effect';
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
+
+import { transformAutomaticContext } from './automatic-transform.js';
 
 import {
   BRIDGE_CONTEXT_PATH,
@@ -23,6 +28,8 @@ import {
 
 export interface CreasekitPluginOptions {
   readonly ttlMs?: number;
+  readonly autoMount?: boolean;
+  readonly excludeModelKeys?: ReadonlyArray<string>;
 }
 
 class RequestBodyTooLargeError extends Error {}
@@ -36,13 +43,54 @@ interface ValidHost {
 
 export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
   let projectRoot: string | undefined;
+  const virtualId = 'virtual:creasekit-runtime';
+  const resolvedId = `\0${virtualId}`;
+  const entry = fileURLToPath(
+    new URL(
+      import.meta.url.endsWith('.ts') ? '../src/automatic-entry.ts' : './automatic.js',
+      import.meta.url,
+    ),
+  );
 
   return {
     name: 'creasekit',
     apply: 'serve',
+    enforce: 'pre',
+    config: () => ({ optimizeDeps: { exclude: ['creasekit'] } }),
     configResolved(config) {
       assertSecureDevelopmentConfig(config);
-      projectRoot = config.root;
+      projectRoot = realpathSync(config.root);
+    },
+    resolveId(id) {
+      if (id === virtualId) return resolvedId;
+    },
+    load(id) {
+      if (id !== resolvedId || projectRoot === undefined) return;
+      const module = JSON.stringify(`/@fs/${entry}`);
+      const configuration = JSON.stringify({
+        projectId: createHash('sha256').update(projectRoot).digest('hex').slice(0, 16),
+        autoMount: options.autoMount ?? true,
+        excludeModelKeys: options.excludeModelKeys ?? [],
+      });
+      return `export * from ${module};\nimport { startAutomaticCreasekit } from ${module};\nconst dispose = startAutomaticCreasekit(${configuration});\nif (import.meta.hot) import.meta.hot.dispose(dispose);`;
+    },
+    transform: {
+      order: 'pre',
+      handler(code, id, transformOptions) {
+        if (projectRoot === undefined || id === entry || transformOptions?.ssr) return;
+        return transformAutomaticContext(code, id, projectRoot);
+      },
+    },
+    transformIndexHtml: {
+      order: 'pre',
+      handler: () => [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          children: `import ${JSON.stringify(virtualId)};`,
+          injectTo: 'head-prepend',
+        },
+      ],
     },
     configureServer(server) {
       if (projectRoot === undefined) {

@@ -25,7 +25,18 @@ export interface FoldkitInspector {
     includeModel: boolean,
   ) => FoldkitContext | undefined;
   readonly subscribe: (listener: () => void) => () => void;
+  readonly resolve?: (context: FoldkitContext) => Element | undefined;
 }
+
+const defaultInspector: { current?: FoldkitInspector } = {};
+export const getDefaultFoldkitInspector = (): FoldkitInspector | undefined =>
+  defaultInspector.current;
+export const setDefaultFoldkitInspector = (
+  inspector: FoldkitInspector | undefined,
+): void => {
+  if (inspector === undefined) delete defaultInspector.current;
+  else defaultInspector.current = inspector;
+};
 
 const redact = (value: Schema.Json, depth = 0): Schema.Json => {
   if (depth > 5) return '[depth limit]';
@@ -190,10 +201,7 @@ export const createFoldkitInspector = <Model>(options: {
   };
 };
 
-export const withoutModel = (context: FoldkitContext): FoldkitContext => ({
-  provenance: context.provenance,
-  boundary: context.boundary,
-  source: context.source,
-  events: context.events,
-  capturedAt: context.capturedAt,
-});
+export const withoutModel = (context: FoldkitContext): FoldkitContext => {
+  const { model: _model, history: _history, ...metadata } = context;
+  return metadata;
+};

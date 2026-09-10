@@ -3,31 +3,23 @@ import { Runtime } from 'foldkit';
 import { mountCreasekit } from './creasekit';
 import { Message, Model, init, update, view } from './main';
 
-const integration = import.meta.env.DEV
-  ? (await import('./development')).makeDevelopmentIntegration(init().model)
-  : undefined;
-
 const application = Runtime.makeApplication({
   Model,
   init,
-  update: integration?.foldkit.observeUpdate(update) ?? update,
-  view: integration?.foldkit.observeView(view) ?? view,
+  update,
+  view,
   container: document.getElementById('root'),
   devTools: false,
 });
 
 Runtime.run(application);
 
-const creasekit = mountCreasekit({
-  projectId: 'creasekit-homepage',
-  startOpen: true,
-  ...(integration === undefined
-    ? {}
-    : { foldkit: integration.foldkit, agent: integration.agent }),
-});
+const creasekit = import.meta.env.PROD
+  ? mountCreasekit({ projectId: 'creasekit-homepage' })
+  : undefined;
 
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => creasekit.destroy());
+  import.meta.hot.dispose(() => creasekit?.destroy());
 }
 
 export { Message };
