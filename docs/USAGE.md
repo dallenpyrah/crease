@@ -1,6 +1,6 @@
 # Use creasekit in your application
 
-Use creasekit to inspect an element, describe a requested change, and review the context before copying or sharing it. First add the overlay and Vite plugin to your existing application by following the [consumer setup](../README.md#add-creasekit-to-an-existing-app). Open the application at its own Vite development URL; it does not need to use the repository demo's port.
+Use creasekit to inspect an element, describe a requested change, and review the context before copying or sharing it. First add the Vite plugin to your existing application by following the [consumer setup](../README.md#add-creasekit-to-an-existing-app). The overlay mounts automatically at the application's own Vite development URL; it does not need to use the repository demo's port.
 
 ## Switch between inspection and normal use
 
@@ -41,11 +41,11 @@ To let a coding agent read a snapshot directly, choose **Share snapshot** in **F
 
 ## Include optional FoldKit context
 
-Registered elements can show their project-relative source file, view, scope, and event Message metadata. A Message is the named event that the application handles. If you enable **Include scoped Model & history**, creasekit includes only the state fields that the developer registered, along with recent observed updates in that scope.
+Instrumented elements can show their project-relative view and element source locations, submodel scope, Model supply site, and declared event Message metadata. A Message is the named event that the application handles. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of that rendered scope. Values are not captured in notes or shared snapshots until you opt in.
 
-That information is opt-in twice: developers must register it, and you must enable Model consent before it is captured. creasekit does not automatically discover source locations, Model ownership, or arbitrary application state. The history reports observed updates in the registered scope; it does not prove that selecting an element caused a particular Message or operation. An element with no matching registration still has ordinary inspection data, but no FoldKit section.
+Source ownership comes from development instrumentation rather than a DOM-selector guess. Unsupported elements retain ordinary inspection data; a verified ancestor's context may be shown without claiming its source as the selected element's creation site. Native DevTools history is unavailable in the automatic integration. Explicit adapters can provide observed updates, which do not prove that an element caused a particular Message or operation.
 
-See [Register FoldKit context](FOLDKIT.md) to add registrations and observation wrappers to an application.
+See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for field exclusions and current limits, or [Register FoldKit context](FOLDKIT.md) for the optional explicit adapter.
 
 ## Keep feedback private
 
@@ -58,13 +58,13 @@ For local connection requirements, session-file handling, limits, and revocation
 
 ## Troubleshooting
 
-| Symptom                                             | What to do                                                                                                                                                               |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Clicking a button selects it instead of running it. | Close creasekit with its icon or `Alt+Shift+C`, then use the button.                                                                                                     |
-| The overlay does not appear.                        | Confirm the development-only mount runs after `Runtime.run(application)`, then restart the application's Vite dev server.                                                |
-| No FoldKit section appears.                         | The selected element needs an explicit registration, and the mounted overlay must receive that inspector. Check for an earlier, broader registration that matches first. |
-| The **Feedback** panel has no sharing controls.     | Add `creasekit()` to the existing Vite plugin list and mount with `agent: createAgentConnection()` in development. Keep the server on local HTTP loopback.               |
-| creasekit reports “Storage unavailable.”            | Copy feedback before closing or reloading. Notes still work in memory, but the browser could not save them.                                                              |
-| Copying fails.                                      | Use the selectable output that creasekit opens and copy it manually. Browser clipboard access may require permission.                                                    |
-| A note's element is gone.                           | Review its saved context in **Feedback**. Edit or delete the note there.                                                                                                 |
-| A panel is in the way.                              | Press `Escape` to dismiss it. Repeated presses clear the selection and then exit inspection.                                                                             |
+| Symptom                                             | What to do                                                                                                                                                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clicking a button selects it instead of running it. | Close creasekit with its icon or `Alt+Shift+C`, then use the button.                                                                                                                                  |
+| The overlay does not appear.                        | Confirm `creasekit()` is in the Vite plugin list and automatic mounting is enabled, then restart the application's Vite dev server.                                                                   |
+| No FoldKit section appears.                         | The selected source may be outside supported instrumentation patterns, uninstrumented, or marked private. Check the automatic-context guide; explicit adapters still require a matching registration. |
+| The **Feedback** panel has no sharing controls.     | Use the automatic Vite plugin setup over local HTTP loopback. An application that mounts manually must pass `agent: createAgentConnection()`.                                                         |
+| creasekit reports “Storage unavailable.”            | Copy feedback before closing or reloading. Notes still work in memory, but the browser could not save them.                                                                                           |
+| Copying fails.                                      | Use the selectable output that creasekit opens and copy it manually. Browser clipboard access may require permission.                                                                                 |
+| A note's element is gone.                           | Review its saved context in **Feedback**. Edit or delete the note there.                                                                                                                              |
+| A panel is in the way.                              | Press `Escape` to dismiss it. Repeated presses clear the selection and then exit inspection.                                                                                                          |

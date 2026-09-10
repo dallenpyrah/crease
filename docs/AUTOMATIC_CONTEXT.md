@@ -1,17 +1,17 @@
 # Automatic FoldKit context
 
-This guide covers the unreleased 0.2.0 implementation on `main`. The published 0.1.0 package still requires the [development mount and optional explicit registrations](../README.md). Automatic integration currently targets FoldKit 0.158.2 and the FoldKit Vite plugin 0.20.2; other versions require verification rather than an assumption of compatibility.
+creasekit 0.2.0 captures source, view, and scoped Model context without application registrations. Automatic integration currently targets FoldKit 0.158.2 and the FoldKit Vite plugin 0.20.2; other versions require verification rather than an assumption of compatibility.
 
-## Try the local package in an existing app
+## Add automatic context to an existing app
 
-Use Node.js 22.12 or later. Build a tarball from this repository, then install the resulting file as a development dependency in the consuming FoldKit application:
+Use Node.js 22.12 or later. Install creasekit as a development dependency in the consuming FoldKit application:
 
 ```bash
-npm pack
+npm install -D creasekit
 ```
 
 ```bash
-npm install -D /absolute/path/to/creasekit-0.2.0.tgz
+bun add -D creasekit
 ```
 
 Add `.creasekit/` to the consuming application's `.gitignore`. Use the existing FoldKit plugin and append creasekit:
@@ -57,7 +57,7 @@ Review the selected values before sharing. Key-based redaction is not a guarante
 
 ## Connect an agent
 
-Use the same installed package for the overlay, Vite bridge, and MCP launcher. For the unpublished local tarball, run the consuming application's installed binary rather than `bunx creasekit` fetching the older npm release:
+Run the consuming application's installed binary to use its package version for the overlay, Vite bridge, and MCP launcher:
 
 ```json
 {
@@ -84,13 +84,13 @@ Automatic source instrumentation remains enabled. An explicitly supplied inspect
 
 ## Limits and troubleshooting
 
-| Symptom                                            | Explanation or action                                                                                                                                                                                                                                                |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No automatic toolbar appears with the npm package. | The published 0.1.0 package does not contain this feature. Use the local 0.2.0 tarball for this guide.                                                                                                                                                               |
-| Only DOM details appear.                           | The selected code is outside the supported instrumentation patterns, comes from an uninstrumented dependency, or is marked private. Do not add a guessed source registration to disguise the missing information.                                                    |
-| A Model declaration is absent.                     | Its supply site may be known without a unique declaration. Imported, derived, or generic Models can require more source resolution than is currently available.                                                                                                      |
-| Runtime history is unavailable.                    | The current automatic integration does not attach native DevTools history without an unambiguous runtime association. It does not force-enable `devTools` or infer causality from recent Messages. Explicit adapters retain their existing bounded history behavior. |
-| A note is detached after HMR or a reload.          | Its old runtime identity or target can no longer be verified. The note and original evidence remain; creasekit does not silently move it to another same-source element.                                                                                             |
-| A repeated element cannot be uniquely located.     | Use FoldKit's normal stable keys and submodel slot IDs. Identical unkeyed nodes are not safely distinguishable from source location alone.                                                                                                                           |
+| Symptom                                        | Explanation or action                                                                                                                                                                                                                                                |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No automatic toolbar appears.                  | Confirm `creasekit()` is in the Vite plugin list, automatic mounting is enabled, and the application is running in development over loopback HTTP. Restart Vite after changing its configuration.                                                                    |
+| Only DOM details appear.                       | The selected code is outside the supported instrumentation patterns, comes from an uninstrumented dependency, or is marked private. Do not add a guessed source registration to disguise the missing information.                                                    |
+| A Model declaration is absent.                 | Its supply site may be known without a unique declaration. Imported, derived, or generic Models can require more source resolution than is currently available.                                                                                                      |
+| Runtime history is unavailable.                | The current automatic integration does not attach native DevTools history without an unambiguous runtime association. It does not force-enable `devTools` or infer causality from recent Messages. Explicit adapters retain their existing bounded history behavior. |
+| A note is detached after HMR or a reload.      | Its old runtime identity or target can no longer be verified. The note and original evidence remain; creasekit does not silently move it to another same-source element.                                                                                             |
+| A repeated element cannot be uniquely located. | Use FoldKit's normal stable keys and submodel slot IDs. Identical unkeyed nodes are not safely distinguishable from source location alone.                                                                                                                           |
 
 Production builds of consuming apps do not inject the toolbar, source metadata registry, or development bridge. The repository's public site intentionally retains its visual overlay, but serves static files only.

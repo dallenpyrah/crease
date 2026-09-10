@@ -2,9 +2,7 @@
 
 # creasekit
 
-Visual feedback and read-only MCP context for FoldKit applications. Mount the overlay in your existing Vite app to inspect elements, leave notes, and share an intentional snapshot with a coding agent.
-
-> **Release status:** `main` contains the unreleased 0.2.0 automatic integration. npm currently provides 0.1.0, whose setup is documented below. For the one-plugin workflow from a local package build, see [Automatic FoldKit context](docs/AUTOMATIC_CONTEXT.md). Do not mix an older MCP launcher with a newer package's automatic snapshots.
+Visual feedback and read-only MCP context for FoldKit applications. Add the Vite plugin to automatically inspect source and scoped Model context, leave notes, and share an intentional snapshot with a coding agent.
 
 ## Add creasekit to an existing app
 
@@ -43,25 +41,17 @@ In an existing config, append `creasekit()` to the existing plugin list and pres
 
 The plugin writes its local session file under Vite's configured `root`, which defaults to the application root. If the config sets `root` to a subdirectory, that directory contains `.creasekit/mcp-session.json` and is the directory to use for `--cwd`.
 
-### Mount the development overlay
+### Start the development overlay
 
-In the application entry module, append only this block **after the existing** `Runtime.run(application)` call. Do not repeat that call. Replace `'my-app'` with a stable project ID for the application.
+Start the application's normal development command:
 
-```ts
-if (import.meta.env.DEV) {
-  const { createAgentConnection, mountCreasekit } = await import('creasekit');
-  const creasekit = mountCreasekit({
-    projectId: 'my-app',
-    agent: createAgentConnection(),
-  });
-
-  if (import.meta.hot) {
-    import.meta.hot.dispose(() => creasekit.destroy());
-  }
-}
+```bash
+npm run dev
 ```
 
-The dynamic import keeps the overlay in development wiring. creasekit includes its own SVG layer and styles, so do not add a CSS import. Start your application as usual and open its own Vite URL. Click the creasekit icon or press `Alt+Shift+C` to open the toolbar; it starts collapsed so normal page interaction still works. The address `http://127.0.0.1:4173` is only this repository's demo address.
+The plugin mounts the overlay automatically in development. No entry-module mount, CSS import, scope registrations, or application-written view/update wrappers are required. Open the application's own Vite URL, then click the creasekit icon or press `Alt+Shift+C` to open the toolbar. It starts collapsed so normal page interaction still works. The address `http://127.0.0.1:4173` is only this repository's demo address.
+
+Normal consumer production builds exclude the overlay, source instrumentation, and MCP bridge. Applications that intentionally own their overlay mount can keep the [optional manual integration](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md#existing-manual-integrations).
 
 ## Share context with an MCP client
 
@@ -87,22 +77,23 @@ npx --yes creasekit --help
 
 The binary starts a stdio MCP server and supports `--cwd <project-root>` and `--help`. Bun follows the binary's Node shebang, so Node.js 22.12 or later is still required. See the complete [MCP setup, tools, and troubleshooting guide](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md).
 
-## Add optional FoldKit context
+## Inspect FoldKit context
 
-The overlay works without application registration. To show a selected element's source location, event Message metadata, a narrow Model projection, and observed updates, import `createFoldkitInspector` from `creasekit`, register the scopes you want to expose, wrap the existing `update` and `view`, and pass the inspector to `mountCreasekit`.
+Supported FoldKit views automatically expose their owning view, original element-builder location, submodel instance, Model supply site, and declared event Messages. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of the rendered scope. Notes freeze the context captured when you create them; later application updates do not rewrite that evidence.
 
-creasekit does not discover source ownership or arbitrary Model values from the DOM. [Register FoldKit context explicitly](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md) when that information is useful.
+See [Automatic FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md) for verified framework versions, field exclusions, and unsupported patterns. Source ownership comes from development instrumentation, not a DOM-selector guess. Native DevTools history is unavailable in the automatic integration; the [optional explicit adapter](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md) supports curated projections and bounded observed updates.
 
 ## What an agent can read
 
 Notes remain in the browser until you copy or explicitly share them. MCP exposes only a captured, read-only snapshot that you chose to share; it expires after 15 minutes and disappears when the Vite dev server stops. Stopping sharing cannot erase information an agent has already read.
 
-Model values and update history are opt-in and limited to developer-registered projections. Review all captured text before sharing it, especially on pages with private information. [Usage and privacy details](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md) and the [MCP sharing limits](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md#sharing-and-privacy) explain the boundary.
+Model values are opt-in, scoped to the rendered view, and excluded from saved annotation storage. Sensitive-looking keys are redacted; configure `excludeModelKeys` for application-specific exclusions. Explicit adapters can include their bounded update history after consent. Review all captured text before sharing it, especially on pages with private information. [Usage and privacy details](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md) and the [MCP sharing limits](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md#sharing-and-privacy) explain the boundary.
 
 ## Documentation
 
 - [Use the overlay](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md)
 - [Connect an MCP client](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md)
+- [Automatic FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md)
 - [Register FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md)
 - [Contribute to creasekit](https://github.com/dallenpyrah/creasekit/blob/main/docs/CONTRIBUTING.md)
 - [Design guide](https://github.com/dallenpyrah/creasekit/blob/main/docs/DESIGN.md)

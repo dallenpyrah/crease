@@ -8,8 +8,8 @@ const model = (): Model => ({ copyStatus: null });
 const copyNpmInstall = Scene.role('button', { name: 'Copy npm install command' });
 const copyMcpConfiguration = Scene.role('button', { name: 'Copy MCP configuration' });
 const viteConfiguration = Scene.nth(Scene.all.selector('pre code'), 3);
-const developmentMount = Scene.nth(Scene.all.selector('pre code'), 4);
-const mcpConfiguration = Scene.nth(Scene.all.selector('pre code'), 6);
+const developmentCommand = Scene.nth(Scene.all.selector('pre code'), 4);
+const mcpConfiguration = Scene.nth(Scene.all.selector('pre code'), 5);
 
 describe('homepage view', () => {
   it('renders the branded heading hierarchy and numbered setup guide', () => {
@@ -32,7 +32,7 @@ describe('homepage view', () => {
         Scene.role('heading', { name: 'Configure Vite', level: 3 }),
       ).toExist(),
       Scene.expect(
-        Scene.role('heading', { name: 'Mount and start in development', level: 3 }),
+        Scene.role('heading', { name: 'Start in development', level: 3 }),
       ).toExist(),
       Scene.expect(
         Scene.role('heading', { name: 'Annotate and review context', level: 3 }),
@@ -52,7 +52,7 @@ describe('homepage view', () => {
       { update, view },
       Scene.given(model()),
       Scene.expectAll(Scene.all.role('listitem')).toHaveCount(21),
-      Scene.expectAll(Scene.all.selector('pre code')).toHaveCount(7),
+      Scene.expectAll(Scene.all.selector('pre code')).toHaveCount(6),
       Scene.expect(Scene.text('npm install -D creasekit')).toExist(),
       Scene.expect(Scene.text('bun add -D creasekit')).toExist(),
       Scene.expect(Scene.text('.creasekit/')).toExist(),
@@ -70,21 +70,12 @@ describe('homepage view', () => {
           '});',
         ].join('\n'),
       ),
-      Scene.expect(developmentMount).toHaveText(
-        [
-          'if (import.meta.env.DEV) {',
-          "  const { createAgentConnection, mountCreasekit } = await import('creasekit');",
-          '  const creasekit = mountCreasekit({',
-          "    projectId: 'my-app',",
-          '    agent: createAgentConnection(),',
-          '  });',
-          '',
-          '  if (import.meta.hot) {',
-          '    import.meta.hot.dispose(() => creasekit.destroy());',
-          '  }',
-          '}',
-        ].join('\n'),
-      ),
+      Scene.expect(developmentCommand).toHaveText('npm run dev'),
+      Scene.expect(
+        Scene.text(
+          'The Vite plugin mounts creasekit automatically in development. No entry-module mount, scope registrations, or view/update wrappers are required. Start your application as usual.',
+        ),
+      ).toExist(),
       Scene.expect(
         Scene.text(
           'Automatic mounting is upcoming on main; installed 0.1.0 projects still need this block.',

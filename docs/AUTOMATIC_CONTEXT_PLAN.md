@@ -1,6 +1,6 @@
 # Automatic FoldKit context and guided setup
 
-Status: approved implementation plan for the unreleased 0.2.0 work. See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for implemented behavior and current limits. This document does not describe capabilities available in creasekit 0.1.0 or authorize publication or Railway deployment.
+Status: implementation plan completed for 0.2.0. This document preserves the design and acceptance criteria; see [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for setup, implemented behavior, and current limits.
 
 ## Goal
 

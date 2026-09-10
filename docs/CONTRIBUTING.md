@@ -51,7 +51,7 @@ For an overlay or interaction change, also inspect the demo in a browser at desk
 
 The library is an observer and overlay, not part of the host application's Model. `observeUpdate` and `observeView` must return the host update and view results unchanged. Keep pointer measurements and overlay state outside the host update loop, do not alter VNode identity, and never dispatch application Messages on an agent's behalf.
 
-The unreleased 0.2.0 integration captures source, declared events, and rendered-scope Model context through development-only instrumentation. Preserve original source coordinates and runtime/instance ownership; omit metadata when ownership cannot be verified. Do not imply that a DOM selector proves source ownership or that an observed update proves element-to-Message causality. See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for the new integration and [Register FoldKit context](FOLDKIT.md) for the supported explicit adapter.
+The automatic integration captures source, declared events, and rendered-scope Model context through development-only instrumentation. Preserve original source coordinates and runtime/instance ownership; omit metadata when ownership cannot be verified. Do not imply that a DOM selector proves source ownership or that an observed update proves element-to-Message causality. See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for the default integration and [Register FoldKit context](FOLDKIT.md) for the supported explicit adapter.
 
 ## Preserve the sharing boundary
 

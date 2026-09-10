@@ -1,6 +1,6 @@
 # Register FoldKit context
 
-This explicit adapter remains the integration path for published 0.1.0 and an optional override for later versions. The unreleased 0.2.0 implementation on `main` adds [automatic source and scoped Model context](AUTOMATIC_CONTEXT.md) without application registrations.
+The explicit adapter is an optional override for applications that need curated projections or observed-update history. For registration-free source and scoped Model capture, use [Automatic FoldKit context](AUTOMATIC_CONTEXT.md). If your application owns its overlay mount, set `creasekit({ autoMount: false })` in Vite and keep the mount and cleanup shown below.
 
 The creasekit overlay works without application registration. Add FoldKit context only when a selected element should expose developer-defined source context, event Message metadata, a narrow Model projection, or observed updates.
 
@@ -84,7 +84,7 @@ if (import.meta.env.DEV) {
 }
 ```
 
-This keeps the inspector, agent connection, observation wrappers, and overlay out of the production path. If an application only needs visual inspection and notes, use the simpler development-only mount in the [consumer setup](../README.md#mount-the-development-overlay) instead.
+This keeps the inspector, agent connection, observation wrappers, and overlay out of the production path. Most applications can use the automatic plugin setup in the [consumer guide](../README.md#start-the-development-overlay) instead.
 
 ## Choose registrations deliberately
 

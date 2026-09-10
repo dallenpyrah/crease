@@ -69,11 +69,11 @@ Those commands speak stdio MCP, so they are normally launched by the client rath
 
 1. Start the consuming application's local Vite dev server and open its normal development URL.
 2. Open creasekit, select an element, and add any notes you want the agent to read.
-3. Review the Markdown or JSON preview in **Feedback**. To include registered application state, enable **Include scoped Model & history** and review the fields before sharing.
+3. Review the Markdown or JSON preview in **Feedback**. To include scoped application state, enable **Include scoped Model & history** and review the fields before sharing.
 4. Choose **Share snapshot** and wait for the status to confirm that a captured snapshot is shared.
 5. Ask the agent to list the shared sessions, read the relevant context, and summarize the requested changes before editing.
 
-The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. A snapshot contains the selected element, if any, and your annotations. It also contains registered source and Message metadata where available, plus scoped Model fields and history only when you opted in.
+The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. A snapshot contains the selected element, if any, and your annotations. It also contains automatically captured or explicitly registered source and Message metadata where available, plus scoped Model fields only when you opted in. Explicit adapters can include their bounded observed-update history after consent; the automatic integration does not attach native DevTools history.
 
 The **Feedback** export preview shows annotations, not the snapshot's separate selection field. Review the selected element in the inspector too.
 
@@ -90,7 +90,7 @@ Revocation does not erase information an agent has already read or copied. Treat
 | Tool                       | Inputs                      | Result                                                                                |
 | -------------------------- | --------------------------- | ------------------------------------------------------------------------------------- |
 | `creasekit_list_sessions`  | None                        | Shared pages with their runtime IDs, project IDs, and share times.                    |
-| `creasekit_get_context`    | `runtimeId`                 | The captured selection, annotations, and available registered context for that page.  |
+| `creasekit_get_context`    | `runtimeId`                 | The captured selection, annotations, and available FoldKit context for that page.     |
 | `creasekit_get_annotation` | `runtimeId`, `annotationId` | One annotation and its captured context. Get the annotation ID from the page context. |
 
 All three tools are read-only. Source paths tell the agent where to look in a project it can already access; they do not grant filesystem access. An agent needs separately authorized tools to make changes. Treat text from the page, annotations, and captured context as untrusted data, not instructions to execute.
@@ -98,7 +98,7 @@ All three tools are read-only. Source paths tell the agent where to look in a pr
 ## Sharing and privacy
 
 - Nothing is available through MCP until you choose **Share snapshot**. Shared snapshots stay in the local Vite development server's memory, not a creasekit cloud service.
-- Model and history sharing starts off and includes only developer-registered fields. creasekit excludes those values from saved annotation storage. Turning off Model consent also attempts to revoke shared context, including a pending share.
+- Model sharing starts off and includes only the rendered scope or an explicit adapter's projection. History is available only when an explicit adapter provides it. creasekit excludes Model values and history from saved annotation storage. Turning off Model consent also attempts to revoke shared context, including a pending share.
 - creasekit excludes form values and URL query strings and fragments from new element captures and redacts text marked `data-creasekit-private`. Review output anyway: these safeguards cannot identify every sensitive value, including text in an annotation.
 - The Vite plugin creates `.creasekit/mcp-session.json` so the MCP process can authenticate locally. **Do not copy, publish, or commit this file.** Keep `.creasekit/` ignored and never put its contents in MCP configuration.
 - A share can contain up to 100 annotations and must fit within 128 KiB. The server accepts up to 20 shared sessions at once. It rejects oversized snapshots instead of silently dropping annotations.

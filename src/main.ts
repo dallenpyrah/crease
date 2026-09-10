@@ -49,7 +49,6 @@ const SnippetId = Schema.Literals([
   'install-bun',
   'ignore-creasekit',
   'vite-config',
-  'development-mount',
   'start-app',
   'mcp-config',
 ]);
@@ -288,25 +287,6 @@ const setupSnippets: ReadonlyArray<SetupSnippet> = [
       '  plugins: [foldkit(), creasekit()],',
       "  server: { host: '127.0.0.1' },",
       '});',
-    ].join('\n'),
-  },
-  {
-    id: 'development-mount',
-    filename: 'src/entry.ts',
-    language: 'TypeScript',
-    copyLabel: 'development mount block',
-    code: [
-      'if (import.meta.env.DEV) {',
-      "  const { createAgentConnection, mountCreasekit } = await import('creasekit');",
-      '  const creasekit = mountCreasekit({',
-      "    projectId: 'my-app',",
-      '    agent: createAgentConnection(),',
-      '  });',
-      '',
-      '  if (import.meta.hot) {',
-      '    import.meta.hot.dispose(() => creasekit.destroy());',
-      '  }',
-      '}',
     ].join('\n'),
   },
   {
@@ -619,17 +599,13 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                     [
                       h.h3(
                         [classAttr(h, css(styles.stepTitle))],
-                        ['Mount and start in development'],
+                        ['Start in development'],
                       ),
                       h.p(
                         [classAttr(h, css(styles.stepText))],
                         [
-                          'To mount the overlay explicitly, add this development-only block after your existing Runtime.run(application) call.',
+                          'The Vite plugin mounts creasekit automatically in development. No entry-module mount, scope registrations, or view/update wrappers are required. Start your application as usual.',
                         ],
-                      ),
-                      h.div(
-                        [classAttr(h, css(styles.snippetList))],
-                        [snippetBlock(h, model, setupSnippet('development-mount'))],
                       ),
                       h.div(
                         [classAttr(h, css(styles.snippetList))],
