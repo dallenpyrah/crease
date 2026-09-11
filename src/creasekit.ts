@@ -170,10 +170,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           <label class="creasekit-setting creasekit-model-setting" hidden>Include scoped Model & history<input type="checkbox" data-setting="model"></label>
           <p class="creasekit-subtitle creasekit-model-setting" hidden>Only scoped, sanitized Model fields are included. Model values stay out of local storage.</p>
           <p class="creasekit-subtitle">Notes persist locally. Visual settings apply to this session.</p>
+          <p class="creasekit-subtitle">Drag the toolbar grip to move it. Hide or restore everything with Alt+Shift+H.</p>
           <div class="creasekit-shortcuts"><span>Toggle creasekit</span><kbd>⌥ ⇧ C</kbd><span>Inspect / annotate</span><span><kbd>I</kbd> <kbd>N</kbd></span><span>Typography / color</span><span><kbd>A</kbd> <kbd>P</kbd></span><span>X-ray / rulers</span><span><kbd>X</kbd> <kbd>R</kbd></span><span>Distance to selected element</span><kbd>hold ⌥</kbd><span>Undo / redo note change</span><span><kbd>⌘ Z</kbd> <kbd>⌘ ⇧ Z</kbd></span><span>Dismiss / exit</span><kbd>esc</kbd></div>
         </div>
       </section>
       <div class="creasekit-toolbar" role="toolbar" aria-label="creasekit tools">
+        <button type="button" class="creasekit-drag" aria-label="Move toolbar" data-tip="Drag to move · arrow keys when focused">⠿</button>
         <button class="creasekit-launcher" data-action="toggle-open" aria-label="Toggle creasekit" data-tip="Toggle creasekit · ⌥ ⇧ C">${icon('creasekit')}</button>
         <div class="creasekit-toolrow">
           ${tool('annotate', 'note', 'Annotate (N)')}<span class="creasekit-divider"></span>
@@ -185,6 +187,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           <button data-action="open-output" aria-label="Open feedback" data-tip="Feedback & agent context">${icon('output')}<span class="creasekit-count" hidden></span></button>
           ${tool('settings', 'settings', 'Settings')}
         </div>
+        ${tool('hide', 'close', 'Hide creasekit (Alt+Shift+H)')}
       </div>
       <div class="creasekit-toast" role="status" aria-live="polite" hidden></div>
     </div>`;
@@ -228,6 +231,24 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   const toast = get<HTMLElement>(shadow, '.creasekit-toast');
   const pins = get<HTMLElement>(shadow, '.creasekit-pins');
   const toolbar = get<HTMLElement>(shadow, '.creasekit-toolbar');
+  const layer = get<HTMLElement>(shadow, '.creasekit-layer');
+  const dragHandle = get<HTMLButtonElement>(shadow, '.creasekit-drag');
+  let hidden = false;
+  let toolbarPosition: { x: number; y: number } | null = null;
+  let drag: { pointerId: number; x: number; y: number } | null = null;
+  const placeToolbar = (): void => {
+    const inset = state.open && state.rulers ? 28 : window.innerWidth <= 480 ? 12 : 16;
+    const rect = toolbar.getBoundingClientRect();
+    const position = toolbarPosition ?? {
+      x: inset,
+      y: inset,
+    };
+    const x = Math.max(0, Math.min(position.x, window.innerWidth - rect.width));
+    const y = Math.max(0, Math.min(position.y, window.innerHeight - rect.height));
+    toolbar.style.left = `${x}px`;
+    toolbar.style.top = `${y}px`;
+    if (toolbarPosition !== null) toolbarPosition = { x, y };
+  };
   const controller = new AbortController();
   let frame: number | null = null;
   let toastTimer: number | null = null;
@@ -774,6 +795,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   };
 
   function render(): void {
+    layer.hidden = hidden;
     get<HTMLElement>(shadow, '.creasekit-toolrow').hidden = !state.open;
     get<HTMLElement>(shadow, '.creasekit-launcher').setAttribute(
       'aria-expanded',
@@ -826,7 +848,8 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         (action === 'open-output' && state.outputOpen) ||
         (action === 'settings' && state.settingsOpen);
       button.classList.toggle('is-active', active);
-      if (action === 'toggle-open') button.removeAttribute('aria-pressed');
+      if (action === 'toggle-open' || action === 'hide')
+        button.removeAttribute('aria-pressed');
       else button.setAttribute('aria-pressed', `${active}`);
     }
     get<HTMLInputElement>(shadow, '[data-setting="pins"]').checked = state.pins;
@@ -851,7 +874,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         : state.shared
           ? 'A captured snapshot is shared. Share again to refresh it.'
           : 'Share a read-only snapshot with your local agent.';
-    toolbar.style.transform = state.open && state.rulers ? 'translate(12px, 12px)' : '';
+    if (!hidden) placeToolbar();
     renderVisual(true);
   }
 
@@ -931,10 +954,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     render();
   };
   const open = (): void => {
+    hidden = false;
     state.open = true;
     render();
   };
   const showOutput = (): void => {
+    hidden = false;
     state.open = true;
     state.outputOpen = true;
     state.settingsOpen = false;
@@ -957,6 +982,11 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     return element !== null && isInspectable(element, host) ? element : null;
   };
   const onPointerMove = (event: PointerEvent): void => {
+    if (drag !== null && event.pointerId === drag.pointerId) {
+      toolbarPosition = { x: event.clientX - drag.x, y: event.clientY - drag.y };
+      placeToolbar();
+      return;
+    }
     if (!state.open || state.mode === null) return;
     const next =
       inside(event) || state.outputOpen || state.settingsOpen ? null : pick(event);
@@ -994,7 +1024,10 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     }
     const action = button.dataset.action;
     if (action === 'toggle-open') state.open ? close() : open();
-    else if (
+    else if (action === 'hide') {
+      hidden = true;
+      close();
+    } else if (
       action === 'inspect' ||
       action === 'annotate' ||
       action === 'typography' ||
@@ -1114,6 +1147,24 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   const onKeyDown = (event: KeyboardEvent): void => {
     const target = event.composedPath()[0];
     if (
+      target === dragHandle &&
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+    ) {
+      event.preventDefault();
+      const rect = toolbar.getBoundingClientRect();
+      const step = event.shiftKey ? 40 : 10;
+      toolbarPosition = {
+        x:
+          rect.x +
+          (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0),
+        y:
+          rect.y +
+          (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0),
+      };
+      placeToolbar();
+      return;
+    }
+    if (
       target instanceof HTMLButtonElement &&
       target.dataset.outputFormat !== undefined &&
       ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)
@@ -1141,6 +1192,17 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       target instanceof Element &&
       (target.matches('input,textarea,select') ||
         target.closest('[contenteditable="true"]') !== null);
+    if (event.altKey && event.shiftKey && event.code === 'KeyH' && !typing) {
+      event.preventDefault();
+      if (!event.repeat) {
+        if (hidden) open();
+        else {
+          hidden = true;
+          close();
+        }
+      }
+      return;
+    }
     if (event.altKey && event.shiftKey && event.code === 'KeyC' && !typing) {
       event.preventDefault();
       state.open ? close() : open();
@@ -1225,6 +1287,30 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     capture: true,
     signal: controller.signal,
   });
+  dragHandle.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (event.button !== 0 || !event.isPrimary) return;
+      const rect = toolbar.getBoundingClientRect();
+      drag = {
+        pointerId: event.pointerId,
+        x: event.clientX - rect.x,
+        y: event.clientY - rect.y,
+      };
+      dragHandle.setPointerCapture(event.pointerId);
+      dragHandle.classList.add('is-dragging');
+      event.preventDefault();
+    },
+    { signal: controller.signal },
+  );
+  const stopDrag = (): void => {
+    if (drag !== null && dragHandle.hasPointerCapture(drag.pointerId))
+      dragHandle.releasePointerCapture(drag.pointerId);
+    drag = null;
+    dragHandle.classList.remove('is-dragging');
+  };
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
+    dragHandle.addEventListener(type, stopDrag, { signal: controller.signal });
   document.addEventListener('click', onClick, {
     capture: true,
     signal: controller.signal,
@@ -1234,9 +1320,16 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     passive: true,
     signal: controller.signal,
   });
-  window.addEventListener('resize', () => scheduleVisual(true), {
-    signal: controller.signal,
-  });
+  window.addEventListener(
+    'resize',
+    () => {
+      if (!hidden) placeToolbar();
+      scheduleVisual(true);
+    },
+    {
+      signal: controller.signal,
+    },
+  );
   window.addEventListener('keydown', onKeyDown, { signal: controller.signal });
   window.addEventListener(
     'keyup',
@@ -1251,6 +1344,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   window.addEventListener(
     'blur',
     () => {
+      stopDrag();
       state.alt = false;
       state.hovered = null;
       scheduleVisual();

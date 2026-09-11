@@ -51,6 +51,8 @@ npm run dev
 
 The plugin mounts the overlay automatically in development. No entry-module mount, CSS import, scope registrations, or application-written view/update wrappers are required. Open the application's own Vite URL, then click the creasekit icon or press `Alt+Shift+C` to open the toolbar. It starts collapsed so normal page interaction still works. The address `http://127.0.0.1:4173` is only this repository's demo address.
 
+Drag the toolbar by its grip to reposition it, or focus the grip and use the arrow keys (`Shift` moves farther). Its position stays in place for the current mount and is kept inside the viewport when resized or expanded. Click **Hide creasekit** or press `Alt+Shift+H` to hide the entire overlay, including its launcher. Press `Alt+Shift+H` again, or `Alt+Shift+C`, to bring it back. Shortcuts are ignored while typing in a form field.
+
 Normal consumer production builds exclude the overlay, source instrumentation, and MCP bridge. Applications that intentionally own their overlay mount can keep the [optional manual integration](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md#existing-manual-integrations).
 
 ## Share context with an MCP client

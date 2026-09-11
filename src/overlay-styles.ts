@@ -19,6 +19,11 @@ button svg { width: 17px; height: 17px; flex-shrink: 0; }
 .creasekit-toolrow { display: flex; align-items: center; gap: 2px; }
 .creasekit-toolbar button { position: relative; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: transparent; }
 .creasekit-toolbar button:hover { background: #f0f0f0; }
+.creasekit-toolbar .creasekit-drag { width: 20px; cursor: grab; touch-action: none; user-select: none; font-size: 22px; color: #777; }
+.creasekit-toolbar .creasekit-drag.is-dragging { cursor: grabbing; }
+.creasekit-toolbar { max-width: calc(100vw - 24px); height: auto; min-height: 42px; }
+.creasekit-toolrow { flex-wrap: wrap; min-width: 0; }
+.creasekit-toolbar > button { flex-shrink: 0; }
 .creasekit-toolbar button.is-active { background: #009dff; color: #fff; }
 .creasekit-toolbar .creasekit-launcher { background: #f1f2f4; color: #353b44; }
 .creasekit-launcher svg { width: 21px; height: 21px; }
