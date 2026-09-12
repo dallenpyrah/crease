@@ -23,6 +23,11 @@ import { type IconName, icon } from './icons.js';
 import { distanceMarkup, distancesBetween, rulerMarkup } from './measurements.js';
 import { overlayStyles } from './overlay-styles.js';
 import { makeLocalPersistence } from './persistence.js';
+import {
+  enrichAnnotations,
+  enrichSelection,
+  enrichSnapshot,
+} from './source-evidence.js';
 
 type Mode = 'inspect' | 'annotate' | 'typography' | 'color';
 type OutputFormat = 'notes' | 'markdown' | 'json';
@@ -71,6 +76,10 @@ const get = <T extends Element>(root: ShadowRoot, selector: string): T => {
 };
 
 const currentTime = (): number => Effect.runSync(Clock.currentTimeMillis);
+const needsSourceEvidence = (selection: AgentSnapshot['selection']): boolean =>
+  selection?.foldkit?.provenance === 'automatic-instrumentation' &&
+  (selection.foldkit.source.revision !== undefined ||
+    selection.foldkit.elementSource?.revision !== undefined);
 const number = (value: number): string => `${Math.round(value * 10) / 10}`;
 const tool = (action: string, name: IconName, label: string): string =>
   `<button type="button" data-action="${action}" aria-label="${label}" data-tip="${label}">${icon(name)}</button>`;
@@ -375,6 +384,74 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     };
   };
 
+  let evidencePreview:
+    | {
+        feedback: Feedback.Model;
+        includeModel: boolean;
+        annotations: ReadonlyArray<Annotation>;
+      }
+    | undefined;
+  let savingNote = false;
+
+  const previewAnnotations = (): ReadonlyArray<Annotation> =>
+    evidencePreview?.feedback === state.feedback &&
+    evidencePreview.includeModel === state.includeModel
+      ? evidencePreview.annotations
+      : exportAnnotations();
+
+  const refreshEvidencePreview = async (): Promise<void> => {
+    const feedback = state.feedback;
+    const includeModel = state.includeModel;
+    const annotations = await enrichAnnotations(exportAnnotations());
+    if (destroyed || feedback !== state.feedback || includeModel !== state.includeModel)
+      return;
+    evidencePreview = { feedback, includeModel, annotations };
+    if (state.outputOpen) render();
+  };
+
+  const copyOutput = async (): Promise<void> => {
+    if (state.copyFallback !== null) {
+      await copy(state.copyFallback);
+      return;
+    }
+    const format = state.outputFormat;
+    const includeModel = state.includeModel;
+    const captured = exportAnnotations();
+    const annotations = captured.some(needsSourceEvidence)
+      ? await enrichAnnotations(captured)
+      : captured;
+    if (destroyed || (includeModel && !state.includeModel)) return;
+    await copy(
+      format === 'json' ? formatJson(annotations) : formatMarkdown(annotations),
+    );
+  };
+
+  const copySelected = async (): Promise<void> => {
+    const selected = state.selected;
+    if (selected === null) return;
+    const includeModel = state.includeModel;
+    const annotations = exportAnnotations().filter(
+      (annotation) => findTarget(annotation) === selected,
+    );
+    const selection = selectedSnapshot();
+    const text =
+      annotations.length > 0
+        ? formatMarkdown(
+            annotations.some(needsSourceEvidence)
+              ? await enrichAnnotations(annotations)
+              : annotations,
+          )
+        : JSON.stringify(
+            needsSourceEvidence(selection)
+              ? await enrichSelection(selection)
+              : selection,
+            null,
+            2,
+          );
+    if (destroyed || (includeModel && !state.includeModel)) return;
+    await copy(text);
+  };
+
   let syncTimer: number | null = null;
   let syncing = false;
   let syncCompletion = Promise.resolve();
@@ -399,7 +476,8 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     const epoch = pageEpoch;
     const acknowledgedCommandIds = [...acknowledgedCommands];
     try {
-      const snapshot: AgentSnapshot = {
+      const feedback = state.feedback;
+      const captured: AgentSnapshot = {
         version: 1,
         runtimeId,
         projectId: options.projectId ?? 'default',
@@ -408,6 +486,28 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         selection: selectedSnapshot(),
         annotations: exportAnnotations(),
       };
+      const snapshot =
+        needsSourceEvidence(captured.selection) ||
+        captured.annotations.some(needsSourceEvidence)
+          ? await enrichSnapshot(captured)
+          : captured;
+      if (
+        destroyed ||
+        pageInactive ||
+        epoch !== pageEpoch ||
+        (includedModel && !state.includeModel)
+      ) {
+        syncAgain = !destroyed && !pageInactive;
+        return;
+      }
+      if (feedback === state.feedback && includedModel === state.includeModel) {
+        evidencePreview = {
+          feedback,
+          includeModel: includedModel,
+          annotations: snapshot.annotations,
+        };
+        if (state.outputOpen) render();
+      }
       const commands =
         agent.sync === undefined
           ? (await agent.share(snapshot), [])
@@ -516,6 +616,21 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         url.pathname !== window.location.pathname
       )
         return null;
+      if (annotation.target.reference !== undefined) {
+        const matches = document.querySelectorAll(
+          `[data-creasekit-ref="${CSS.escape(annotation.target.reference)}"]`,
+        );
+        const match = matches.length === 1 ? matches[0] : undefined;
+        if (
+          match === undefined ||
+          match.closest('[data-creasekit-private],[data-crease-private]')
+        )
+          return null;
+        const href = annotation.target.location?.href;
+        if (href !== undefined && snapshotElement(match).location?.href !== href)
+          return null;
+        return match;
+      }
       if (annotation.foldkit?.provenance === 'automatic-instrumentation')
         return options.foldkit?.resolve?.(annotation.foldkit) ?? null;
       const matches = document.querySelectorAll(annotation.target.selector);
@@ -891,7 +1006,8 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       target.className = 'creasekit-list-target';
       target.dataset.action = 'focus-note';
       target.dataset.annotationId = annotation.id;
-      target.textContent = `${index + 1}. ${annotation.target.tag} · ${annotation.target.text || annotation.target.role}`;
+      const region = annotation.target.location?.region;
+      target.textContent = `${index + 1}. ${region !== undefined && region.labelSource !== 'tag' ? region.label : annotation.target.tag} · ${annotation.target.location?.accessibleName ?? (annotation.target.text || annotation.target.role)}`;
       head.append(target);
       if (findTarget(annotation) === null) {
         const detached = document.createElement('span');
@@ -935,10 +1051,13 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       !state.open || !state.settingsOpen;
     composer.hidden = !state.composerOpen;
     get<HTMLElement>(shadow, '.creasekit-card-actions').hidden = state.composerOpen;
-    get<HTMLButtonElement>(shadow, '[data-action="add"]').textContent =
-      state.editingId === null ? 'Add feedback' : 'Save changes';
+    get<HTMLButtonElement>(shadow, '[data-action="add"]').textContent = savingNote
+      ? 'Capturing source…'
+      : state.editingId === null
+        ? 'Add feedback'
+        : 'Save changes';
     get<HTMLButtonElement>(shadow, '[data-action="add"]').disabled =
-      state.draft.trim().length === 0;
+      savingNote || state.draft.trim().length === 0;
     renderDetails();
     renderFoldkit();
     renderNotes();
@@ -947,8 +1066,8 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     outputCode.textContent =
       state.copyFallback ??
       (state.outputFormat === 'json'
-        ? formatJson(exportAnnotations())
-        : formatMarkdown(exportAnnotations()));
+        ? formatJson(previewAnnotations())
+        : formatMarkdown(previewAnnotations()));
     for (const button of shadow.querySelectorAll<HTMLButtonElement>(
       '[data-output-format]',
     )) {
@@ -1027,8 +1146,9 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     if (state.composerOpen) textarea.focus();
   };
 
-  const saveNote = (): void => {
+  const saveNote = async (): Promise<void> => {
     if (
+      savingNote ||
       (state.selected === null && state.editingId === null) ||
       state.draft.trim().length === 0
     )
@@ -1044,7 +1164,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     } else {
       const selected = selectedSnapshot();
       if (selected === null) return;
-      change = Feedback.add(state.feedback, {
+      let annotation: Annotation = {
         ...makeAnnotation(
           selected.target,
           state.draft,
@@ -1052,7 +1172,32 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           Effect.runSync(Effect.sync(() => crypto.randomUUID())),
         ),
         ...(selected.foldkit === undefined ? {} : { foldkit: selected.foldkit }),
-      });
+      };
+      if (needsSourceEvidence(selected)) {
+        const feedback = state.feedback;
+        const element = state.selected;
+        const draft = state.draft;
+        savingNote = true;
+        render();
+        try {
+          annotation = (await enrichAnnotations([annotation]))[0] ?? annotation;
+        } finally {
+          savingNote = false;
+        }
+        if (destroyed) return;
+        if (
+          feedback !== state.feedback ||
+          element !== state.selected ||
+          draft !== state.draft ||
+          !state.composerOpen
+        ) {
+          render();
+          return;
+        }
+        if (!state.includeModel && annotation.foldkit !== undefined)
+          annotation = { ...annotation, foldkit: withoutModel(annotation.foldkit) };
+      }
+      change = Feedback.add(state.feedback, annotation);
     }
     state.draft = '';
     state.editingId = null;
@@ -1082,6 +1227,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     state.settingsOpen = false;
     state.hovered = null;
     render();
+    void refreshEvidencePreview();
   };
   const setMode = (mode: Mode): void => {
     state.mode = state.mode === mode ? null : mode;
@@ -1172,7 +1318,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       state.draft = '';
       textarea.value = '';
       render();
-    } else if (action === 'add') saveNote();
+    } else if (action === 'add') void saveNote();
     else if (action === 'open-output')
       state.outputOpen ? ((state.outputOpen = false), render()) : showOutput();
     else if (action === 'close-output') {
@@ -1186,23 +1332,9 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     } else if (action === 'close-settings') {
       state.settingsOpen = false;
       render();
-    } else if (action === 'copy-output')
-      void copy(
-        state.copyFallback ??
-          (state.outputFormat === 'json'
-            ? formatJson(exportAnnotations())
-            : formatMarkdown(exportAnnotations())),
-      );
+    } else if (action === 'copy-output') void copyOutput();
     else if (action === 'copy-selected' && state.selected !== null) {
-      const selected = state.selected;
-      const annotations = exportAnnotations().filter(
-        (annotation) => findTarget(annotation) === selected,
-      );
-      void copy(
-        annotations.length > 0
-          ? formatMarkdown(annotations)
-          : JSON.stringify(selectedSnapshot(), null, 2),
-      );
+      void copySelected();
     } else if (action === 'clear-annotations') {
       mutate(Feedback.clear(state.feedback));
       showToast('Feedback cleared. Undo to restore it.');

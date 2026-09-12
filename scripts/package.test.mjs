@@ -329,7 +329,7 @@ test(
           );
           assert(scripts.length > 0);
           assert.equal(
-            /data-creasekit-root|\/__creasekit\/share|Include scoped Model & history/.test(
+            /data-creasekit-root|data-creasekit-ref|\/__creasekit\/share|Include scoped Model & history/.test(
               scripts.join('\n'),
             ),
             false,

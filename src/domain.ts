@@ -24,6 +24,30 @@ export const ElementStyles = Schema.Struct({
 });
 export type ElementStyles = typeof ElementStyles.Type;
 
+export const ElementLocation = Schema.Struct({
+  pagePath: Schema.String,
+  pageHeading: Schema.optionalKey(Schema.String),
+  region: Schema.optionalKey(
+    Schema.Struct({
+      role: Schema.String,
+      label: Schema.String,
+      labelSource: Schema.Literals(['aria-label', 'aria-labelledby', 'heading', 'tag']),
+    }),
+  ),
+  accessibleName: Schema.optionalKey(Schema.String),
+  position: Schema.optionalKey(
+    Schema.Struct({
+      index: Schema.Number,
+      total: Schema.Number,
+      kind: Schema.Literal('rendered-sibling'),
+    }),
+  ),
+  current: Schema.optionalKey(Schema.String),
+  selected: Schema.optionalKey(Schema.Boolean),
+  href: Schema.optionalKey(Schema.String),
+});
+export type ElementLocation = typeof ElementLocation.Type;
+
 export const ElementTarget = Schema.Struct({
   tag: Schema.String,
   selector: Schema.String,
@@ -33,6 +57,8 @@ export const ElementTarget = Schema.Struct({
   url: Schema.String,
   bounds: Bounds,
   styles: ElementStyles,
+  reference: Schema.optionalKey(Schema.String),
+  location: Schema.optionalKey(ElementLocation),
 });
 export type ElementTarget = typeof ElementTarget.Type;
 

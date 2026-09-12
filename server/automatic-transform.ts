@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +19,8 @@ import type {
   VariableDeclaration,
 } from '@babel/types';
 import MagicString, { type SourceMap } from 'magic-string';
+
+import type { SourceSpan } from '../src/source-schema.js';
 
 const VIRTUAL_RUNTIME = 'virtual:creasekit-runtime';
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -94,7 +97,8 @@ interface CapturePlan {
   readonly call: CallExpression;
   readonly receiver: string;
   readonly source: ViewSource;
-  readonly kind: 'element' | 'submodel';
+  readonly kind: 'element' | 'helper' | 'submodel';
+  readonly attributes?: Expression;
   readonly modelSource?: ModelSource;
 }
 
@@ -119,6 +123,8 @@ interface ModelSource {
 interface AstContext {
   readonly code: string;
   readonly file: string;
+  readonly revision: string;
+  readonly sourceEvidence: boolean;
   readonly rootScope: Scope;
   readonly scopes: WeakMap<Node, Scope>;
   readonly parents: WeakMap<Node, Node>;
@@ -126,15 +132,32 @@ interface AstContext {
   readonly tokens: ReadonlyArray<unknown>;
 }
 
+export interface AutomaticSourceReference {
+  readonly source: SourceSpan;
+  readonly start: number;
+  readonly end: number;
+  readonly snippetStart: number;
+  readonly snippetEnd: number;
+  readonly snippetTruncated: boolean;
+  readonly attributesStart?: number;
+  readonly attributesEnd?: number;
+}
+
 export interface AutomaticTransformResult {
   readonly code: string;
   readonly map: SourceMap;
+  readonly sourceReferences: ReadonlyArray<AutomaticSourceReference>;
+}
+
+export interface AutomaticTransformOptions {
+  readonly sourceEvidence?: boolean;
 }
 
 export const transformAutomaticContext = (
   code: string,
   id: string,
   root: string,
+  options: AutomaticTransformOptions = {},
 ): AutomaticTransformResult | null => {
   const resolvedFile = resolveApplicationFile(id, root);
   if (resolvedFile === undefined) return null;
@@ -158,6 +181,8 @@ export const transformAutomaticContext = (
   const context: AstContext = {
     code,
     file: resolvedFile.file,
+    revision: createHash('sha256').update(code).digest('hex'),
+    sourceEvidence: options.sourceEvidence === true,
     rootScope: scopeState.root,
     scopes: scopeState.scopes,
     parents: scopeState.parents,
@@ -175,6 +200,7 @@ export const transformAutomaticContext = (
     registrations,
     expressionRegistrations,
   );
+  if (context.sourceEvidence) propagateBuilderHelpers(ast.program, context);
   const captures = discoverCaptures(ast.program, context, expressionRegistrations);
 
   if (
@@ -191,6 +217,7 @@ export const transformAutomaticContext = (
   const observeRuntime = uniqueName('__creasekitObserveRuntime', names);
   const captureCall = uniqueName('__creasekitCaptureCall', names);
   const magic = new MagicString(code, { filename: resolvedFile.file });
+  const sourceReferences = new Map<string, AutomaticSourceReference>();
 
   for (const plan of expressionRegistrations.values()) {
     const start = plan.expression.start;
@@ -199,10 +226,10 @@ export const transformAutomaticContext = (
     magic.prependLeft(start, `${registerFunction}(`);
     magic.appendLeft(
       end,
-      `,${encodeSource(plan.source, context.file)}${
+      `,${encodeSource(plan.source, context, sourceReferences)}${
         plan.modelDefinition === undefined
           ? ''
-          : `,${encodeSource(plan.modelDefinition, context.file)}`
+          : `,${encodeSource(plan.modelDefinition, context, sourceReferences)}`
       })`,
     );
   }
@@ -221,10 +248,10 @@ export const transformAutomaticContext = (
       plans
         .map(
           (plan) =>
-            `\n${registerFunction}(${plan.binding.name},${encodeSource(plan.source, context.file)}${
+            `\n${registerFunction}(${plan.binding.name},${encodeSource(plan.source, context, sourceReferences)}${
               plan.modelDefinition === undefined
                 ? ''
-                : `,${encodeSource(plan.modelDefinition, context.file)}`
+                : `,${encodeSource(plan.modelDefinition, context, sourceReferences)}`
             });`,
         )
         .join(''),
@@ -236,10 +263,10 @@ export const transformAutomaticContext = (
     magic.prependLeft(plan.config.start, `${observeRuntime}(`);
     magic.appendLeft(
       plan.config.end ?? plan.config.start,
-      `,${encodeSource(plan.source, context.file)}${
+      `,${encodeSource(plan.source, context, sourceReferences)}${
         plan.modelSource === undefined
           ? ''
-          : `,${encodeModelSource(plan.modelSource, context.file)}`
+          : `,${encodeModelSource(plan.modelSource, context, sourceReferences)}`
       })`,
     );
   }
@@ -253,10 +280,13 @@ export const transformAutomaticContext = (
     magic.overwrite(
       closing,
       closing + 1,
-      `],${encodeSource(plan.source, context.file)},${JSON.stringify(plan.kind)}${
+      `],${encodeSource(plan.source, context, sourceReferences, {
+        call: plan.call,
+        ...(plan.attributes === undefined ? {} : { attributes: plan.attributes }),
+      })},${JSON.stringify(plan.kind)}${
         plan.modelSource === undefined
           ? ''
-          : `,${encodeModelSource(plan.modelSource, context.file)}`
+          : `,${encodeModelSource(plan.modelSource, context, sourceReferences)}`
       })`,
     );
   }
@@ -283,6 +313,7 @@ export const transformAutomaticContext = (
       includeContent: true,
       source: resolvedFile.file,
     }),
+    sourceReferences: Array.from(sourceReferences.values()),
   };
 };
 
@@ -763,6 +794,50 @@ const discoverRuntimes = (
   return plans;
 };
 
+const propagateBuilderHelpers = (program: Node, context: AstContext): void => {
+  const maximumPasses = Math.min(context.bindings.length + 1, 32);
+  for (let pass = 0; pass < maximumPasses; pass += 1) {
+    let changed = false;
+    walk(program, (node) => {
+      if (node.type !== 'CallExpression') return;
+      const scope = context.scopes.get(node);
+      if (scope === undefined) return;
+      const helper = localHelperFunctionForCall(node, scope, context);
+      if (helper === undefined) return;
+      const helperSource = functionSource(helper, context);
+      for (let index = 0; index < node.arguments.length; index += 1) {
+        const argument = node.arguments[index];
+        if (
+          argument === undefined ||
+          argument.type === 'SpreadElement' ||
+          !isExpressionNode(argument)
+        ) {
+          continue;
+        }
+        const builder = builderBindingForExpression(argument, scope, context);
+        if (builder?.builderSource === undefined) continue;
+        const parameter = helper.params[index];
+        const identifier =
+          parameter === undefined || parameter.type === 'RestElement'
+            ? undefined
+            : parameterIdentifier(parameter);
+        if (identifier === undefined) continue;
+        const helperScope = context.scopes.get(helper);
+        const binding =
+          helperScope === undefined
+            ? undefined
+            : resolveBinding(helperScope, identifier.name);
+        if (binding === undefined || binding.identifier !== identifier) continue;
+        if (binding.builderSource === undefined) {
+          binding.builderSource = helperSource ?? builder.builderSource;
+          changed = true;
+        }
+      }
+    });
+    if (!changed) return;
+  }
+};
+
 const discoverCaptures = (
   program: Node,
   context: AstContext,
@@ -777,6 +852,7 @@ const discoverCaptures = (
 
     const direct = directBuilderCall(node, scope);
     if (direct !== undefined && ELEMENT_BUILDERS.has(direct.method)) {
+      const attributes = callArgumentExpression(node, 0);
       plans.push({
         call: node,
         receiver: direct.binding.name,
@@ -785,6 +861,7 @@ const discoverCaptures = (
           node,
         },
         kind: 'element',
+        ...(attributes === undefined ? {} : { attributes }),
       });
       planned.add(node);
       return;
@@ -792,6 +869,7 @@ const discoverCaptures = (
 
     const keyed = keyedBuilderCall(node, scope);
     if (keyed !== undefined) {
+      const attributes = callArgumentExpression(node, 1);
       plans.push({
         call: node,
         receiver: 'void 0',
@@ -800,52 +878,183 @@ const discoverCaptures = (
           node,
         },
         kind: 'element',
+        ...(attributes === undefined ? {} : { attributes }),
       });
       planned.add(node);
       return;
     }
 
-    if (direct?.method !== 'submodel' || direct.binding.builderSource === undefined)
-      return;
-    const config = node.arguments[0];
-    if (config === undefined || config.type === 'SpreadElement') return;
-    const object = resolveObject(config, scope);
-    if (object === undefined) return;
-    const viewProperty = definiteProperty(object, 'view');
-    const modelProperty = definiteProperty(object, 'model');
-    const viewValue = propertyValue(viewProperty);
-    const modelExpression = expressionPropertyValue(modelProperty);
-    if (viewValue === undefined || modelExpression === undefined) return;
-    const source = viewSource(viewValue, viewProperty, scope, context);
-    if (source === undefined) return;
-    const valueScope = context.scopes.get(viewValue) ?? scope;
-    if (isRegisterableExpression(viewValue)) {
-      const viewFunction = resolveFunction(viewValue, valueScope, context);
-      const modelDefinition =
-        viewFunction === undefined
-          ? undefined
-          : modelDefinitionForFunction(viewFunction, context);
-      expressionRegistrations.set(viewValue, {
-        expression: viewValue,
+    if (direct?.method === 'submodel' && direct.binding.builderSource !== undefined) {
+      const config = node.arguments[0];
+      if (config === undefined || config.type === 'SpreadElement') return;
+      const object = resolveObject(config, scope);
+      if (object === undefined) return;
+      const viewProperty = definiteProperty(object, 'view');
+      const modelProperty = definiteProperty(object, 'model');
+      const viewValue = propertyValue(viewProperty);
+      const modelExpression = expressionPropertyValue(modelProperty);
+      if (viewValue === undefined || modelExpression === undefined) return;
+      const source = viewSource(viewValue, viewProperty, scope, context);
+      if (source === undefined) return;
+      const valueScope = context.scopes.get(viewValue) ?? scope;
+      if (isRegisterableExpression(viewValue)) {
+        const viewFunction = resolveFunction(viewValue, valueScope, context);
+        const modelDefinition =
+          viewFunction === undefined
+            ? undefined
+            : modelDefinitionForFunction(viewFunction, context);
+        expressionRegistrations.set(viewValue, {
+          expression: viewValue,
+          source,
+          ...(modelDefinition === undefined ? {} : { modelDefinition }),
+        });
+      }
+      plans.push({
+        call: node,
+        receiver: direct.binding.name,
         source,
-        ...(modelDefinition === undefined ? {} : { modelDefinition }),
+        kind: 'submodel',
+        modelSource: modelSource(
+          modelExpression,
+          context.scopes.get(modelExpression) ?? scope,
+          context,
+          modelDefinitionFromView(viewValue, valueScope, context),
+        ),
       });
+      planned.add(node);
+      return;
+    }
+
+    if (!context.sourceEvidence) return;
+    const callerBuilder = nearestBuilderBinding(scope);
+    const helper = localHelperFunctionForCall(node, scope, context);
+    if (
+      callerBuilder?.builderSource === undefined ||
+      helper === undefined ||
+      !functionUsesBuilder(helper, context)
+    ) {
+      return;
     }
     plans.push({
       call: node,
-      receiver: direct.binding.name,
-      source,
-      kind: 'submodel',
-      modelSource: modelSource(
-        modelExpression,
-        context.scopes.get(modelExpression) ?? scope,
-        context,
-        modelDefinitionFromView(viewValue, valueScope, context),
-      ),
+      receiver: 'void 0',
+      source: { view: callerBuilder.builderSource.view, node },
+      kind: 'helper',
     });
     planned.add(node);
   });
   return plans;
+};
+
+const callArgumentExpression = (
+  call: CallExpression,
+  index: number,
+): Expression | undefined => {
+  const argument = call.arguments[index];
+  return argument === undefined ||
+    argument.type === 'SpreadElement' ||
+    !isExpressionNode(argument)
+    ? undefined
+    : argument;
+};
+
+const nearestBuilderBinding = (scope: Scope): Binding | undefined => {
+  let current: Scope | undefined = scope;
+  while (current !== undefined) {
+    for (const binding of current.bindings.values()) {
+      if (binding.builderSource !== undefined) return binding;
+    }
+    current = current.parent;
+  }
+  return undefined;
+};
+
+const builderBindingForExpression = (
+  expression: Expression,
+  scope: Scope,
+  context: AstContext,
+  seen: Set<Binding> = new Set(),
+): Binding | undefined => {
+  const unwrapped = unwrapExpression(expression);
+  if (unwrapped.type !== 'Identifier') return undefined;
+  const binding = resolveBinding(scope, unwrapped.name);
+  if (binding === undefined || seen.has(binding)) return undefined;
+  if (binding.builderSource !== undefined) return binding;
+  if (
+    binding.variableKind !== 'const' ||
+    binding.initializer == null ||
+    binding.declaration.type === 'ImportDeclaration'
+  ) {
+    return undefined;
+  }
+  seen.add(binding);
+  const initializerScope = context.scopes.get(binding.initializer) ?? binding.scope;
+  return builderBindingForExpression(
+    binding.initializer,
+    initializerScope,
+    context,
+    seen,
+  );
+};
+
+const localHelperFunctionForCall = (
+  call: CallExpression,
+  scope: Scope,
+  context: AstContext,
+): BabelFunction | undefined => {
+  if (call.optional === true || call.callee.type !== 'Identifier') return undefined;
+  let binding = resolveBinding(scope, call.callee.name);
+  const seen = new Set<Binding>();
+  while (binding !== undefined && !seen.has(binding)) {
+    seen.add(binding);
+    if (
+      binding.declaration.type === 'ImportDeclaration' ||
+      binding.importRole !== undefined ||
+      binding.importTypeOnly === true
+    ) {
+      return undefined;
+    }
+    if (binding.functionNode !== undefined) return binding.functionNode;
+    if (binding.variableKind !== 'const' || binding.initializer == null) {
+      return undefined;
+    }
+    const initializer = unwrapExpression(binding.initializer);
+    if (initializer.type !== 'Identifier') return undefined;
+    binding = resolveBinding(
+      context.scopes.get(initializer) ?? binding.scope,
+      initializer.name,
+    );
+  }
+  return undefined;
+};
+
+const functionUsesBuilder = (
+  fn: BabelFunction,
+  context: AstContext,
+  seen: Set<BabelFunction> = new Set(),
+): boolean => {
+  if (seen.has(fn)) return false;
+  seen.add(fn);
+  let usesBuilder = false;
+  walk(fn.body, (node) => {
+    if (usesBuilder || node.type !== 'CallExpression') return;
+    const scope = context.scopes.get(node);
+    if (scope === undefined) return;
+    const direct = directBuilderCall(node, scope);
+    if (
+      (direct !== undefined &&
+        (ELEMENT_BUILDERS.has(direct.method) || direct.method === 'submodel')) ||
+      keyedBuilderCall(node, scope) !== undefined
+    ) {
+      usesBuilder = true;
+      return;
+    }
+    const nested = localHelperFunctionForCall(node, scope, context);
+    if (nested !== undefined && functionUsesBuilder(nested, context, seen)) {
+      usesBuilder = true;
+    }
+  });
+  return usesBuilder;
 };
 
 const directBuilderCall = (
@@ -1463,29 +1672,153 @@ const isDefineViewCallExpression = (
 ): expression is CallExpression =>
   expression.type === 'CallExpression' && isDefineViewCall(expression, scope);
 
-const encodeSource = (source: ViewSource, file: string): string => {
-  const location = source.node.loc?.start;
-  return JSON.stringify({
-    file,
-    view: boundedLabel(source.view),
-    line: location?.line ?? 1,
-    column: (location?.column ?? 0) + 1,
-  });
+const encodeSource = (
+  source: ViewSource,
+  context: AstContext,
+  references: Map<string, AutomaticSourceReference>,
+  options: {
+    readonly call?: CallExpression;
+    readonly attributes?: Expression;
+  } = {},
+): string => {
+  const span = sourceSpan(source, context);
+  const start = source.node.start ?? 0;
+  const end = source.node.end ?? start;
+  const isCapturedCall = options.call === source.node;
+  const defaultSnippet = safeSourceSnippetRange(source.node);
+  const snippetStart = isCapturedCall
+    ? (options.call?.start ?? start)
+    : defaultSnippet.start;
+  const snippetEnd = isCapturedCall
+    ? (options.attributes?.end ?? options.call?.callee.end ?? end)
+    : defaultSnippet.end;
+  const reference: AutomaticSourceReference = {
+    source: span,
+    start,
+    end,
+    snippetStart: Math.max(start, Math.min(snippetStart, end)),
+    snippetEnd: Math.max(start, Math.min(snippetEnd, end)),
+    snippetTruncated:
+      snippetStart > start || snippetEnd < end || defaultSnippet.truncated,
+    ...(isCapturedCall && options.attributes?.start != null
+      ? {
+          attributesStart: options.attributes.start,
+          attributesEnd: options.attributes.end ?? options.attributes.start,
+        }
+      : {}),
+  };
+  const key = sourceSpanKey(span);
+  const existing = references.get(key);
+  if (
+    existing === undefined ||
+    (existing.attributesStart === undefined && reference.attributesStart !== undefined)
+  ) {
+    references.set(key, reference);
+  }
+  return JSON.stringify(
+    context.sourceEvidence
+      ? span
+      : {
+          file: span.file,
+          view: span.view,
+          line: span.line,
+          column: span.column,
+        },
+  );
 };
 
-const encodeModelSource = (source: ModelSource, file: string): string => {
-  const location = source.node.loc?.start;
+const encodeModelSource = (
+  source: ModelSource,
+  context: AstContext,
+  references: Map<string, AutomaticSourceReference>,
+): string => {
+  const start = source.node.loc?.start;
+  const end = source.node.loc?.end;
   return JSON.stringify({
     expression: source.expression,
-    file,
-    line: location?.line ?? 1,
-    column: (location?.column ?? 0) + 1,
+    file: context.file,
+    line: start?.line ?? 1,
+    column: (start?.column ?? 0) + 1,
+    ...(context.sourceEvidence
+      ? {
+          endLine: end?.line ?? start?.line ?? 1,
+          endColumn: (end?.column ?? start?.column ?? 0) + 1,
+          revision: context.revision,
+        }
+      : {}),
     ...(source.definition === undefined
       ? {}
       : {
-          definition: JSON.parse(encodeSource(source.definition, file)),
+          definition: JSON.parse(encodeSource(source.definition, context, references)),
         }),
   });
+};
+
+const sourceSpan = (source: ViewSource, context: AstContext): SourceSpan => {
+  const start = source.node.loc?.start;
+  const end = source.node.loc?.end;
+  return {
+    file: context.file,
+    view: boundedLabel(source.view),
+    line: start?.line ?? 1,
+    column: (start?.column ?? 0) + 1,
+    endLine: end?.line ?? start?.line ?? 1,
+    endColumn: (end?.column ?? start?.column ?? 0) + 1,
+    revision: context.revision,
+  };
+};
+
+const sourceSpanKey = (source: SourceSpan): string =>
+  [
+    source.file,
+    source.view,
+    source.line,
+    source.column,
+    source.endLine,
+    source.endColumn,
+    source.revision,
+  ].join('\u0000');
+
+const safeSourceSnippetRange = (
+  node: Node,
+): { readonly start: number; readonly end: number; readonly truncated: boolean } => {
+  const start = node.start ?? 0;
+  const end = node.end ?? start;
+  const fn = sourceFunction(node);
+  if (fn === undefined) return { start, end, truncated: false };
+  const bodyStart = fn.body.start;
+  if (bodyStart == null || bodyStart <= start || bodyStart >= end) {
+    return { start, end, truncated: false };
+  }
+  const snippetEnd =
+    fn.body.type === 'BlockStatement' ? Math.min(bodyStart + 1, end) : bodyStart;
+  return { start, end: snippetEnd, truncated: snippetEnd < end };
+};
+
+const sourceFunction = (node: Node): BabelFunction | undefined => {
+  if (isFunctionNode(node)) return node;
+  if (
+    (node.type === 'ExportNamedDeclaration' ||
+      node.type === 'ExportDefaultDeclaration') &&
+    node.declaration != null
+  ) {
+    return sourceFunction(node.declaration);
+  }
+  if (node.type === 'VariableDeclaration') {
+    for (const declaration of node.declarations) {
+      if (declaration.init == null) continue;
+      const initializer = unwrapExpression(declaration.init);
+      if (isFunctionNode(initializer)) return initializer;
+      if (initializer.type === 'CallExpression') {
+        for (const argument of initializer.arguments) {
+          if (argument.type !== 'SpreadElement' && isFunctionNode(argument)) {
+            return argument;
+          }
+        }
+      }
+    }
+  }
+  return undefined;
 };
 
 const declarationAnchor = (node: Node, parents: WeakMap<Node, Node>): Node => {

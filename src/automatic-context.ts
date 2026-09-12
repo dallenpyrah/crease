@@ -8,6 +8,9 @@ export interface AutomaticSource {
   readonly view: string;
   readonly line: number;
   readonly column: number;
+  readonly endLine?: number;
+  readonly endColumn?: number;
+  readonly revision?: string;
 }
 
 export interface AutomaticModelSource {
@@ -22,6 +25,11 @@ interface Scope {
   readonly source: AutomaticSource;
   readonly boundary: string;
   readonly model: unknown;
+  readonly stableSlot: boolean;
+  readonly calls: ReadonlyArray<{
+    readonly kind: 'submodel' | 'helper';
+    readonly source: AutomaticSource;
+  }>;
   readonly modelSource?: AutomaticModelSource;
 }
 
@@ -37,18 +45,39 @@ interface RenderedNode {
   readonly instance: string;
 }
 
+interface ElementReference {
+  readonly reference: string;
+  readonly identity: string;
+  readonly kind: 'identity' | 'element';
+}
+
+interface ReferenceCandidate {
+  readonly element: Element;
+  readonly rendered: RenderedNode;
+  readonly identity: string;
+  readonly stableIdentity: boolean;
+  readonly excluded: boolean;
+}
+
 interface RuntimeRecord {
   readonly id: string;
   root: unknown;
   elements: Map<Element, RenderedNode>;
+  references: Map<Element, ElementReference>;
+  identityReferences: Map<string, string>;
+  keyTokens: Map<string, string>;
   pending: boolean;
 }
 
 const createAutomaticContext = () => {
+  const REFERENCE_ATTRIBUTE = 'data-creasekit-ref';
+  const PRIVATE_OR_OVERLAY_SELECTOR =
+    '[data-creasekit-private],[data-crease-private],[data-creasekit-root]';
   const functions = new WeakMap<object, AutomaticSource>();
   const modelDefinitions = new WeakMap<object, AutomaticSource>();
   let nodes = new WeakMap<object, NodeMetadata>();
   let elements = new WeakMap<Element, RenderedNode>();
+  const ownedReferences = new Map<Element, string>();
   const runtimes = new Set<RuntimeRecord>();
   const listeners = new Set<() => void>();
   let activeScope: Scope | undefined;
@@ -81,6 +110,83 @@ const createAutomaticContext = () => {
     }
   };
 
+  const isExcludedElement = (element: Element): boolean => {
+    let current: Element | null = element;
+    while (current !== null) {
+      if (current.matches(PRIVATE_OR_OVERLAY_SELECTOR)) return true;
+      if (current.parentElement !== null) {
+        current = current.parentElement;
+        continue;
+      }
+      const root = current.getRootNode();
+      current = root instanceof ShadowRoot ? root.host : null;
+    }
+    return false;
+  };
+
+  const referenceIdentity = (rendered: RenderedNode): string =>
+    JSON.stringify([
+      rendered.instance,
+      rendered.metadata.source.file,
+      rendered.metadata.source.view,
+      rendered.metadata.source.line,
+      rendered.metadata.source.column,
+    ]);
+
+  const ownsReference = (element: Element, reference: string): boolean =>
+    ownedReferences.get(element) === reference &&
+    element.getAttribute(REFERENCE_ATTRIBUTE) === reference;
+
+  const installReference = (element: Element, reference: string): boolean => {
+    const owned = ownedReferences.get(element);
+    const current = element.getAttribute(REFERENCE_ATTRIBUTE);
+    if (owned !== undefined && current !== owned) ownedReferences.delete(element);
+    if (ownedReferences.get(element) === undefined) {
+      if (current !== null) return false;
+      element.setAttribute(REFERENCE_ATTRIBUTE, reference);
+      ownedReferences.set(element, reference);
+      return true;
+    }
+    if (ownedReferences.get(element) !== reference) {
+      element.setAttribute(REFERENCE_ATTRIBUTE, reference);
+      ownedReferences.set(element, reference);
+    }
+    return true;
+  };
+
+  const releaseReference = (element: Element, reference: string): void => {
+    if (ownedReferences.get(element) !== reference) return;
+    if (element.getAttribute(REFERENCE_ATTRIBUTE) === reference)
+      element.removeAttribute(REFERENCE_ATTRIBUTE);
+    ownedReferences.delete(element);
+  };
+
+  const clearRuntimeElements = (runtime: RuntimeRecord): void => {
+    for (const [element, rendered] of runtime.elements) {
+      if (elements.get(element) === rendered) elements.delete(element);
+    }
+    runtime.elements.clear();
+  };
+
+  const clearRuntimeReferences = (runtime: RuntimeRecord): void => {
+    for (const [element, reference] of runtime.references)
+      releaseReference(element, reference.reference);
+    runtime.references.clear();
+    runtime.identityReferences.clear();
+    runtime.keyTokens.clear();
+  };
+
+  const discardReplacedReferences = (runtime: RuntimeRecord): void => {
+    for (const [element, reference] of runtime.references) {
+      if (ownsReference(element, reference.reference)) continue;
+      if (ownedReferences.get(element) === reference.reference)
+        ownedReferences.delete(element);
+      runtime.references.delete(element);
+      if (runtime.identityReferences.get(reference.identity) === reference.reference)
+        runtime.identityReferences.delete(reference.identity);
+    }
+  };
+
   const prune = (): boolean => {
     let changed = false;
     for (const runtime of runtimes) {
@@ -90,8 +196,8 @@ const createAutomaticContext = () => {
         runtime.root.elm.isConnected
       )
         continue;
-      for (const element of runtime.elements.keys()) elements.delete(element);
-      runtime.elements.clear();
+      clearRuntimeElements(runtime);
+      clearRuntimeReferences(runtime);
       runtime.root = undefined;
       runtimes.delete(runtime);
       changed = true;
@@ -125,35 +231,105 @@ const createAutomaticContext = () => {
 
   const commit = (runtime: RuntimeRecord): void => {
     runtime.pending = false;
-    for (const element of runtime.elements.keys()) elements.delete(element);
-    runtime.elements.clear();
-    const pending = [{ node: runtime.root, keys: '' }];
+    discardReplacedReferences(runtime);
+    clearRuntimeElements(runtime);
+    const pending = [{ node: runtime.root, keys: '', keyed: false }];
     const seen = new Set<object>();
+    const candidates: Array<ReferenceCandidate> = [];
+    const keyTokens = new Map<string, string>();
     while (pending.length > 0 && seen.size < 20_000) {
       const next = pending.pop();
       if (next === undefined || !isVNode(next.node) || seen.has(next.node)) continue;
       const node = next.node;
       seen.add(node);
       const key = node.key;
-      const keys = `${next.keys}${typeof key === 'string' || typeof key === 'number' ? `/${JSON.stringify(key)}` : ''}`;
+      const hasKey = typeof key === 'string' || typeof key === 'number';
+      const keys = `${next.keys}${hasKey ? `/${JSON.stringify(key)}` : ''}`;
+      const keyed = next.keyed || hasKey;
       const metadata = nodes.get(node);
-      if (
-        metadata !== undefined &&
-        node.elm instanceof Element &&
-        node.elm.isConnected
-      ) {
-        const rendered = {
+      if (metadata !== undefined && node.elm instanceof Element) {
+        const keyToken =
+          keys === ''
+            ? ''
+            : (keyTokens.get(keys) ??
+              runtime.keyTokens.get(keys) ??
+              Effect.runSync(Effect.sync(() => crypto.randomUUID())));
+        if (keys !== '') keyTokens.set(keys, keyToken);
+        const rendered: RenderedNode = {
           node,
           metadata,
-          instance: `${runtime.id}|${metadata.scope.boundary}|${keys}`,
+          instance: `${runtime.id}|${metadata.scope.boundary}|${keyToken}`,
         };
-        elements.set(node.elm, rendered);
-        runtime.elements.set(node.elm, rendered);
+        const candidate: ReferenceCandidate = {
+          element: node.elm,
+          rendered,
+          identity: referenceIdentity(rendered),
+          stableIdentity: keyed || metadata.scope.stableSlot,
+          excluded: isExcludedElement(node.elm),
+        };
+        candidates.push(candidate);
+        if (!candidate.excluded && node.elm.isConnected) {
+          elements.set(node.elm, rendered);
+          runtime.elements.set(node.elm, rendered);
+        }
       }
       if (Array.isArray(node.children)) {
-        for (const child of node.children) pending.push({ node: child, keys });
+        for (const child of node.children) pending.push({ node: child, keys, keyed });
       }
     }
+
+    runtime.keyTokens = keyTokens;
+
+    const identityCounts = new Map<string, number>();
+    for (const candidate of candidates) {
+      identityCounts.set(
+        candidate.identity,
+        (identityCounts.get(candidate.identity) ?? 0) + 1,
+      );
+    }
+    const nextReferences = new Map<Element, ElementReference>();
+    const nextIdentityReferences = new Map<string, string>();
+    for (const candidate of candidates) {
+      if (candidate.excluded) continue;
+      const unique = identityCounts.get(candidate.identity) === 1;
+      if (candidate.stableIdentity && unique) {
+        const reference =
+          runtime.identityReferences.get(candidate.identity) ??
+          `ck_${Effect.runSync(Effect.sync(() => crypto.randomUUID()))}`;
+        if (!installReference(candidate.element, reference)) continue;
+        nextReferences.set(candidate.element, {
+          reference,
+          identity: candidate.identity,
+          kind: 'identity',
+        });
+        nextIdentityReferences.set(candidate.identity, reference);
+        continue;
+      }
+
+      const previous = runtime.references.get(candidate.element);
+      const reference =
+        previous?.kind === 'element' &&
+        previous.identity === candidate.identity &&
+        ownsReference(candidate.element, previous.reference)
+          ? previous.reference
+          : `ck_${Effect.runSync(Effect.sync(() => crypto.randomUUID()))}`;
+      if (!installReference(candidate.element, reference)) continue;
+      nextReferences.set(candidate.element, {
+        reference,
+        identity: candidate.identity,
+        kind: 'element',
+      });
+    }
+    for (const [element, reference] of runtime.references) {
+      if (nextReferences.get(element)?.reference !== reference.reference)
+        releaseReference(element, reference.reference);
+    }
+    runtime.references.clear();
+    for (const [element, reference] of nextReferences)
+      runtime.references.set(element, reference);
+    runtime.identityReferences.clear();
+    for (const [identity, reference] of nextIdentityReferences)
+      runtime.identityReferences.set(identity, reference);
     prune();
     notify();
   };
@@ -170,6 +346,9 @@ const createAutomaticContext = () => {
       id: Effect.runSync(Effect.sync(() => crypto.randomUUID())),
       root: undefined,
       elements: new Map(),
+      references: new Map(),
+      identityReferences: new Map(),
+      keyTokens: new Map(),
       pending: false,
     };
     const currentGeneration = generation;
@@ -193,6 +372,8 @@ const createAutomaticContext = () => {
           source: owner,
           boundary: `${owner.file}#${owner.view}`,
           model: args[0],
+          stableSlot: false,
+          calls: [],
           ...(origin === undefined ? {} : { modelSource: origin }),
         };
         try {
@@ -219,12 +400,23 @@ const createAutomaticContext = () => {
     receiver: unknown,
     args: unknown[],
     source: AutomaticSource,
-    kind: 'element' | 'submodel',
+    kind: 'element' | 'submodel' | 'helper',
     modelSource?: AutomaticModelSource,
   ): unknown => {
     if (typeof fn !== 'function')
       throw new TypeError('The instrumented FoldKit builder is not callable');
     const parent = activeScope;
+    if (kind === 'helper' && parent !== undefined) {
+      activeScope = {
+        ...parent,
+        calls: [...parent.calls, { kind, source }].slice(-8),
+      };
+      try {
+        return fn.apply(receiver, args);
+      } finally {
+        activeScope = parent;
+      }
+    }
     const config = args[0];
     if (
       kind === 'submodel' &&
@@ -273,10 +465,13 @@ const createAutomaticContext = () => {
     const view = config.view;
     const owner = sourceOf(view, source);
     const origin = modelOrigin(view, modelSource);
+    const slotId = typeof config.slotId === 'string' ? config.slotId : undefined;
     const scope: Scope = {
       source: owner,
-      boundary: `${parent.boundary}/${typeof config.slotId === 'string' ? config.slotId.replaceAll('%', '%25').replaceAll('/', '%2F') : '(unknown slot)'}`,
+      boundary: `${parent.boundary}/${slotId === undefined ? '(unknown slot)' : slotId.replaceAll('%', '%25').replaceAll('/', '%2F')}`,
       model: config.model,
+      stableSlot: parent.stableSlot || slotId !== undefined,
+      calls: [...parent.calls, { kind: 'submodel' as const, source }].slice(-8),
       ...(origin === undefined ? {} : { modelSource: origin }),
     };
     const viewInputs = config.viewInputs;
@@ -381,24 +576,24 @@ const createAutomaticContext = () => {
     generation += 1;
     observer?.disconnect();
     observer = undefined;
-    nodes = new WeakMap();
-    elements = new WeakMap();
     for (const runtime of runtimes) {
+      clearRuntimeElements(runtime);
+      clearRuntimeReferences(runtime);
       runtime.root = undefined;
-      runtime.elements.clear();
     }
     runtimes.clear();
+    for (const [element, reference] of ownedReferences)
+      releaseReference(element, reference);
+    ownedReferences.clear();
+    nodes = new WeakMap();
+    elements = new WeakMap();
     activeScope = undefined;
     notify();
   };
 
   const automaticInspector: FoldkitInspector = {
     inspect(element, includeModel) {
-      if (
-        !element.isConnected ||
-        element.closest('[data-creasekit-private],[data-crease-private]')
-      )
-        return undefined;
+      if (!element.isConnected || isExcludedElement(element)) return undefined;
       let owner: Element | null = element;
       let found: RenderedNode | undefined;
       while (owner !== null) {
@@ -409,11 +604,40 @@ const createAutomaticContext = () => {
       }
       if (found === undefined || owner === null) return undefined;
       const { metadata, instance } = found;
+      const layout: Array<typeof import('./foldkit-schema.js').FoldkitLayout.Type> = [];
+      let ancestor = element.parentElement;
+      while (ancestor !== null && layout.length < 4) {
+        if (isExcludedElement(ancestor)) break;
+        const entry = elements.get(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        const style = getComputedStyle(ancestor);
+        layout.push({
+          tag: ancestor.tagName.toLowerCase(),
+          ...(entry !== undefined && isVNode(entry.node) && entry.node.elm === ancestor
+            ? { source: { ...entry.metadata.source } }
+            : {}),
+          bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          display: style.display,
+          position: style.position,
+          padding: style.padding,
+          border: style.border,
+          gap: style.gap,
+          overflow: style.overflow,
+          scrollTop: ancestor.scrollTop,
+          scrollLeft: ancestor.scrollLeft,
+        });
+        ancestor = ancestor.parentElement;
+      }
       return {
         provenance: 'automatic-instrumentation',
         boundary: metadata.scope.boundary,
         source: { ...metadata.scope.source },
         ...(owner === element ? { elementSource: { ...metadata.source } } : {}),
+        calls: metadata.scope.calls.map((call) => ({
+          ...call,
+          source: { ...call.source },
+        })),
+        layout,
         ...(metadata.scope.modelSource === undefined
           ? {}
           : { modelSource: structuredClone(metadata.scope.modelSource) }),
@@ -422,6 +646,8 @@ const createAutomaticContext = () => {
         availability: [
           'Model values describe the rendered scope, not proven per-element dependencies.',
           'Runtime history is unavailable without an unambiguous FoldKit DevTools connection.',
+          'Only instrumented helper and submodel invocations are observed; other caller edges may be missing.',
+          'Ancestor layout and authored style references are candidates, not a diagnosis or a verified CSS cascade winner.',
           ...(owner === element
             ? []
             : [

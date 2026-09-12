@@ -81,7 +81,11 @@ The binary starts a stdio MCP server and supports `--cwd <project-root>` and `--
 
 ## Inspect FoldKit context
 
-Supported FoldKit views automatically expose their owning view, original element-builder location, submodel instance, Model supply site, and declared event Messages. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of the rendered scope. Annotation source captures remain frozen when you create them; the live selection updates as the page changes. Annotations are synchronized automatically while mounted.
+**Copy for agent** and the existing MCP context tools return source-first evidence: the selected builder's original file, symbol, range, and bounded code excerpt; observed helper/submodel callers; and nearby layout ancestors with their source and spacing measurements. Supported StyleX references include their application and declaration locations. Style and layout candidates are not presented as a proven diagnosis or CSS cascade winner. No app-side attributes or selector registrations are required.
+
+Source excerpts are captured with the annotation and checked again against file revisions when copying or synchronizing. Changed source is marked stale rather than silently moving the saved location. Unsupported source mappings are reported as unavailable. Runtime references help reattach notes inside the browser; they are not code-search anchors or permanent business IDs. Available page headings, region labels, rendered-sibling positions, and ARIA state provide supporting location context.
+
+Supported FoldKit views also expose their owning view, Model supply site, and declared event Messages. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of the rendered scope. Model values remain opt-in and are not persisted. Source excerpts and annotation text are stored locally with the annotation; review them before sharing.
 
 See [Automatic FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md) for verified framework versions, field exclusions, and unsupported patterns. Source ownership comes from development instrumentation, not a DOM-selector guess. Native DevTools history is unavailable in the automatic integration; the [optional explicit adapter](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md) supports curated projections and bounded observed updates.
 

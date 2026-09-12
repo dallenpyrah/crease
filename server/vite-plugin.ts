@@ -7,6 +7,12 @@ import { Schema } from 'effect';
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
 
 import { transformAutomaticContext } from './automatic-transform.js';
+import {
+  InvalidSourceContextRequestError,
+  SOURCE_CONTEXT_PATH,
+  SourceEvidenceRegistry,
+  decodeSourceContextRequest,
+} from './source-evidence.js';
 
 import {
   BRIDGE_COMMANDS_PATH,
@@ -52,6 +58,7 @@ interface ValidHost {
 
 export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
   let projectRoot: string | undefined;
+  let sourceEvidence: SourceEvidenceRegistry | undefined;
   const virtualId = 'virtual:creasekit-runtime';
   const resolvedId = `\0${virtualId}`;
   const entry = fileURLToPath(
@@ -72,6 +79,7 @@ export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
         config.server.fs.deny.push(SESSION_DIRECTORY_DENY_GLOB);
       }
       projectRoot = realpathSync(config.root);
+      sourceEvidence = new SourceEvidenceRegistry(projectRoot);
     },
     resolveId(id) {
       if (id === virtualId) return resolvedId;
@@ -90,7 +98,15 @@ export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
       order: 'pre',
       handler(code, id, transformOptions) {
         if (projectRoot === undefined || id === entry || transformOptions?.ssr) return;
-        return transformAutomaticContext(code, id, projectRoot);
+        const transformed = transformAutomaticContext(code, id, projectRoot, {
+          sourceEvidence: true,
+        });
+        if (transformed === null) {
+          sourceEvidence?.unregisterTransform(id);
+          return;
+        }
+        sourceEvidence?.registerTransform(id, code, transformed.sourceReferences);
+        return transformed;
       },
     },
     transformIndexHtml: {
@@ -114,7 +130,14 @@ export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
         );
       }
 
-      installBridge(server, projectRoot, options);
+      sourceEvidence?.setResolver(async (specifier, importer) => {
+        const resolved = await server.pluginContainer.resolveId(specifier, importer, {
+          ssr: false,
+        });
+        return resolved?.id;
+      });
+
+      installBridge(server, projectRoot, options, sourceEvidence);
     },
   };
 };
@@ -137,6 +160,7 @@ const installBridge = (
   server: ViteDevServer,
   projectRoot: string,
   options: CreasekitPluginOptions,
+  sourceEvidence: SourceEvidenceRegistry | undefined,
 ): void => {
   const httpServer = server.httpServer;
   if (httpServer === null) return;
@@ -150,7 +174,7 @@ const installBridge = (
   let installation: Promise<void> | undefined;
 
   server.middlewares.use((request, response, next) => {
-    void handleBridgeRequest(request, response, descriptor, store).then(
+    void handleBridgeRequest(request, response, descriptor, store, sourceEvidence).then(
       (handled) => {
         if (!handled) next();
       },
@@ -221,6 +245,7 @@ const handleBridgeRequest = async (
   response: ServerResponse,
   descriptor: SessionDescriptor | undefined,
   store: SnapshotStore,
+  sourceEvidence: SourceEvidenceRegistry | undefined,
 ): Promise<boolean> => {
   const requestUrl = parseRequestUrl(request.url);
   if (requestUrl === undefined) return false;
@@ -235,12 +260,55 @@ const handleBridgeRequest = async (
     requestUrl.pathname === BRIDGE_CONTEXT_PATH ||
     requestUrl.pathname === BRIDGE_SYNC_PATH ||
     requestUrl.pathname === BRIDGE_COMMANDS_PATH ||
-    requestUrl.pathname === BRIDGE_WATCH_PATH;
+    requestUrl.pathname === BRIDGE_WATCH_PATH ||
+    requestUrl.pathname === SOURCE_CONTEXT_PATH;
   if (!bridgePath) return false;
 
   const host = validateHost(request);
   if (host === undefined) {
     sendJson(response, 403, { error: 'invalid_host' });
+    return true;
+  }
+
+  if (requestUrl.pathname === SOURCE_CONTEXT_PATH) {
+    if (request.method !== 'POST') {
+      sendMethodNotAllowed(response, 'POST');
+      return true;
+    }
+    if (!hasSameOrigin(request, host)) {
+      sendJson(response, 403, { error: 'invalid_origin' });
+      return true;
+    }
+    if (!isJsonContentType(request.headers['content-type'])) {
+      sendJson(response, 415, { error: 'application_json_required' });
+      return true;
+    }
+    if (requestUrl.search !== '') {
+      sendJson(response, 400, { error: 'invalid_query' });
+      return true;
+    }
+    let input: unknown;
+    try {
+      input = await readJsonBody(request);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError) {
+        sendJson(response, 413, { error: 'request_body_too_large' });
+      } else {
+        sendJson(response, 400, { error: 'malformed_json' });
+      }
+      return true;
+    }
+    try {
+      const sources = decodeSourceContextRequest(input);
+      const evidence = await sourceEvidence?.sources(sources);
+      sendJson(response, 200, { sources: evidence ?? [] });
+    } catch (error) {
+      if (error instanceof InvalidSourceContextRequestError) {
+        sendJson(response, 422, { error: 'invalid_source_context_request' });
+      } else {
+        sendJson(response, 500, { error: 'internal_source_context_error' });
+      }
+    }
     return true;
   }
 

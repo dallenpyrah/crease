@@ -1,11 +1,21 @@
 import {
   type Bounds,
+  type ElementLocation,
   type ElementStyles,
   type ElementTarget,
   redactedPageUrl,
 } from './domain.js';
 
 const MAX_TEXT_LENGTH = 120;
+const PRIVATE_SELECTOR =
+  '[data-creasekit-private], [data-crease-private], [data-creasekit-root]';
+
+const automaticReference = (element: Element): string | undefined => {
+  const reference = element.getAttribute('data-creasekit-ref');
+  return reference !== null && /^ck_[0-9a-f-]{36}$/i.test(reference)
+    ? reference
+    : undefined;
+};
 
 const escapeSelector = (value: string): string => {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -100,6 +110,14 @@ export const selectorFor = (element: Element): string => {
 
   while (current !== null && current.nodeType === Node.ELEMENT_NODE) {
     const tag = current.tagName.toLowerCase();
+    const reference = automaticReference(current);
+    if (
+      reference !== undefined &&
+      document.querySelectorAll(`[data-creasekit-ref="${reference}"]`).length === 1
+    ) {
+      parts.unshift(`[data-creasekit-ref="${reference}"]`);
+      break;
+    }
     if (current.id.length > 0) {
       parts.unshift(`#${escapeSelector(current.id)}`);
       break;
@@ -133,16 +151,127 @@ export const selectorFor = (element: Element): string => {
   return parts.join(' > ');
 };
 
-export const snapshotElement = (element: Element): ElementTarget => ({
-  tag: element.tagName.toLowerCase(),
-  selector: selectorFor(element),
-  role: implicitRole(element),
-  text: visibleText(element),
-  classes: element.getAttribute('class') ?? '',
-  url: redactedPageUrl(window.location.href),
-  bounds: elementBounds(element),
-  styles: elementStyles(element),
-});
+const accessibleLabel = (
+  element: Element,
+): { label: string; labelSource: 'aria-label' | 'aria-labelledby' } | undefined => {
+  if (element.closest(PRIVATE_SELECTOR)) return undefined;
+  const ids = element.getAttribute('aria-labelledby')?.trim().split(/\s+/).slice(0, 10);
+  const labels = ids?.map((id) => document.getElementById(id));
+  if (
+    labels?.length &&
+    labels.every((label) => label !== null && !label.closest(PRIVATE_SELECTOR))
+  ) {
+    const label = labels
+      .map((label) => (label === null ? '' : visibleText(label)))
+      .join(' ')
+      .trim()
+      .slice(0, MAX_TEXT_LENGTH);
+    if (label) return { label, labelSource: 'aria-labelledby' };
+  }
+  const label = element
+    .getAttribute('aria-label')
+    ?.replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_TEXT_LENGTH);
+  return label ? { label, labelSource: 'aria-label' } : undefined;
+};
+
+const locationFor = (element: Element): ElementLocation => {
+  const location: { -readonly [K in keyof ElementLocation]: ElementLocation[K] } = {
+    pagePath: window.location.pathname,
+  };
+  if (element.closest(`${PRIVATE_SELECTOR}, input, textarea, select`)) return location;
+  const pageHeading = Array.from(
+    document.querySelectorAll('main h1, [role="main"] h1, body > h1'),
+  ).find((heading) => !heading.closest(PRIVATE_SELECTOR));
+  if (pageHeading !== undefined) {
+    const label = visibleText(pageHeading);
+    if (label) location.pageHeading = label;
+  }
+  const regions =
+    'nav, main, aside, section, [role="list"], [role="listbox"], [role="grid"], [role="table"], [role="region"], [role="navigation"]';
+  const region = element.parentElement?.closest(regions);
+  if (region !== null && region !== undefined && !region.closest(PRIVATE_SELECTOR)) {
+    const explicit = accessibleLabel(region);
+    const heading = Array.from(region.querySelectorAll('h1,h2,h3,h4,h5,h6')).find(
+      (candidate) =>
+        candidate.closest(regions) === region && !candidate.closest(PRIVATE_SELECTOR),
+    );
+    const headingLabel = heading === undefined ? '' : visibleText(heading);
+    location.region = {
+      role: region.getAttribute('role') ?? region.tagName.toLowerCase(),
+      ...(explicit ?? {
+        label: headingLabel || region.tagName.toLowerCase(),
+        labelSource: headingLabel ? 'heading' : 'tag',
+      }),
+    };
+  }
+  const name = accessibleLabel(element);
+  if (name !== undefined) location.accessibleName = name.label;
+  const row = element.closest(
+    'li, article, tr, [role="listitem"], [role="row"], [role="option"]',
+  );
+  if (row !== null && row.parentElement !== null) {
+    const siblings = Array.from(row.parentElement.children).filter(
+      (candidate) =>
+        candidate.tagName === row.tagName &&
+        candidate.getAttribute('role') === row.getAttribute('role') &&
+        !candidate.matches('[hidden], [aria-hidden="true"]') &&
+        !candidate.closest(PRIVATE_SELECTOR) &&
+        getComputedStyle(candidate).display !== 'none',
+    );
+    const index = siblings.indexOf(row);
+    if (index >= 0)
+      location.position = {
+        index: index + 1,
+        total: siblings.length,
+        kind: 'rendered-sibling',
+      };
+  }
+  const current =
+    element.getAttribute('aria-current') ?? row?.getAttribute('aria-current');
+  if (
+    current &&
+    ['page', 'step', 'location', 'date', 'time', 'true', 'false'].includes(current)
+  )
+    location.current = current;
+  const selected =
+    element.getAttribute('aria-selected') ?? row?.getAttribute('aria-selected');
+  if (selected === 'true' || selected === 'false')
+    location.selected = selected === 'true';
+  const link = element.closest('a[href]');
+  if (link !== null) {
+    try {
+      const href = new URL(link.getAttribute('href') ?? '', window.location.href);
+      if (
+        href.origin === window.location.origin &&
+        !href.username &&
+        !href.password &&
+        ['http:', 'https:'].includes(href.protocol)
+      )
+        location.href = redactedPageUrl(href.href);
+    } catch {}
+  }
+  return location;
+};
+
+export const snapshotElement = (element: Element): ElementTarget => {
+  const reference = element.closest(PRIVATE_SELECTOR)
+    ? undefined
+    : automaticReference(element);
+  return {
+    tag: element.tagName.toLowerCase(),
+    selector: selectorFor(element),
+    role: implicitRole(element),
+    text: visibleText(element),
+    classes: element.getAttribute('class') ?? '',
+    url: redactedPageUrl(window.location.href),
+    bounds: elementBounds(element),
+    styles: elementStyles(element),
+    ...(reference === undefined ? {} : { reference }),
+    location: locationFor(element),
+  };
+};
 
 export const spacingToNearestSibling = (
   element: Element,

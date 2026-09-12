@@ -1,10 +1,26 @@
 import { Schema } from 'effect';
 
-export const FoldkitSource = Schema.Struct({
-  file: Schema.String,
-  view: Schema.String,
-  line: Schema.optionalKey(Schema.Number),
-  column: Schema.optionalKey(Schema.Number),
+import { SourceEvidence } from './source-schema.js';
+
+export const FoldkitSource = SourceEvidence;
+
+export const FoldkitLayout = Schema.Struct({
+  tag: Schema.String,
+  source: Schema.optionalKey(FoldkitSource),
+  bounds: Schema.Struct({
+    x: Schema.Number,
+    y: Schema.Number,
+    width: Schema.Number,
+    height: Schema.Number,
+  }),
+  display: Schema.String,
+  position: Schema.String,
+  padding: Schema.String,
+  border: Schema.String,
+  gap: Schema.String,
+  overflow: Schema.String,
+  scrollTop: Schema.Number,
+  scrollLeft: Schema.Number,
 });
 
 export const FoldkitModelSource = Schema.Struct({
@@ -33,6 +49,15 @@ export const FoldkitContext = Schema.Struct({
   boundary: Schema.String,
   source: FoldkitSource,
   elementSource: Schema.optionalKey(FoldkitSource),
+  calls: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        kind: Schema.Literals(['submodel', 'helper']),
+        source: FoldkitSource,
+      }),
+    ),
+  ),
+  layout: Schema.optionalKey(Schema.Array(FoldkitLayout)),
   modelSource: Schema.optionalKey(FoldkitModelSource),
   instanceKey: Schema.optionalKey(Schema.String),
   availability: Schema.optionalKey(Schema.Array(Schema.String)),

@@ -1,6 +1,6 @@
 # Automatic FoldKit context
 
-creasekit 0.2.0 captures source, view, and scoped Model context without application registrations. Automatic integration currently targets FoldKit 0.158.2 and the FoldKit Vite plugin 0.20.2; other versions require verification rather than an assumption of compatibility.
+creasekit captures source, view, and scoped Model context without application registrations. Automatic integration currently targets FoldKit 0.158.2 and the FoldKit Vite plugin 0.20.2; other versions require verification rather than an assumption of compatibility.
 
 ## Add automatic context to an existing app
 
@@ -45,6 +45,26 @@ Enable **Include scoped Model & history** to include a bounded, sanitized snapsh
 
 Annotations freeze the context captured when the note is created. Their preview, Markdown/JSON export, and MCP snapshot retain that evidence instead of silently replacing it with later application state. Saved notes exclude Model values and history.
 
+## Source-first agent output
+
+**Copy for agent**, Markdown/JSON export, and the existing MCP context tools include the selected builder's project-relative file, enclosing symbol, original range, and bounded literal excerpt when verified. Positions are one-based and the end is exclusive. Owning view definitions and observed helper/submodel invocation sites are separate records: one shared builder may render many instances.
+
+Up to four layout ancestors provide source locations where available, bounds, display, position, padding, border, gap, overflow, and scroll offsets. These measurements help an agent inspect container spacing without assuming the selected row should change. Unsupported parent mappings remain absent rather than borrowing another element's source.
+
+The development server resolves supported StyleX references to their application and declaration spans. Conditional references remain candidates; an authored declaration match does not establish the winning computed CSS property. Runtime IDs and generated class names are not substitutes for authored source. In particular, helpers that retain only `stylex.props(...).className` can discard StyleX's optional source attribute.
+
+Source excerpts are bounded and captured with the note. Copy and automatic sync validate source revisions again. Changed files produce stale evidence; unavailable mappings or a stopped development server do not produce a false current result. The resolver accepts registered instrumentation references, not arbitrary browser-supplied file paths. Source reads stay within the real project root and exclude credential files. Source excerpts and comments remain untrusted data, never instructions to execute.
+
+## Browser reattachment and semantic location
+
+The development observer adds opaque `data-creasekit-ref` attributes to supported instrumented DOM elements after rendering. They contain no source paths, Model values, or item keys. Existing app-authored attributes are preserved, and private regions are excluded.
+
+Unique keyed source/view instances keep their references across consecutive renders within the same runtime, including keyed reordering and replacement DOM nodes. Unkeyed elements do not receive a made-up business identity: their references are tied to their DOM instances. On reset or runtime disposal, creasekit removes the attributes it owns. References are not durable across full reloads or guaranteed after an item leaves the rendered tree.
+
+Annotations automatically capture the pathname, an available main heading, the nearest region's ARIA label or heading, the rendered sibling index, and explicit `aria-current` or `aria-selected` state. Generic tags are identified as tag fallbacks; creasekit does not invent names from generated CSS classes. Rendered position is not a database index or a claim about items outside a virtualized list.
+
+Agent-facing Markdown prioritizes source evidence and readable location, not the short runtime reference. A missing or duplicated reference does not fall back to whichever row occupies the old position. A changed internal link destination also prevents reattachment to a recycled message row. Unsupported elements retain the existing selector fallback. Runtime item keys are kept private; rendered-sibling positions are not dataset indices or permanent identity.
+
 ## Exclude Model fields
 
 Automatic capture already redacts sensitive-looking keys and omits accessors and functions. Add application-specific property names to exclude them at any depth:
@@ -70,7 +90,7 @@ Run the consuming application's installed binary to use its package version for 
 }
 ```
 
-The directory passed to `--cwd` must be the configured Vite root containing `.creasekit/mcp-session.json`. Review the feedback and choose **Share snapshot**. The MCP tools remain read-only and can only read explicitly shared snapshots; **Stop sharing** revokes the current snapshot.
+The directory passed to `--cwd` must be the configured Vite root containing `.creasekit/mcp-session.json`. Annotations sync automatically while the page is loaded. MCP can read, delete, and clear annotations; no manual sharing step is required.
 
 ## Existing manual integrations
 
