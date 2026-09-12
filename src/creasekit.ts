@@ -24,6 +24,7 @@ import { distanceMarkup, distancesBetween, rulerMarkup } from './measurements.js
 import { overlayStyles } from './overlay-styles.js';
 import { makeLocalPersistence } from './persistence.js';
 import {
+  type SourceEvidenceOptions,
   enrichAnnotations,
   enrichSelection,
   enrichSnapshot,
@@ -38,6 +39,7 @@ export interface CreasekitOptions {
   readonly startOpen?: boolean;
   readonly foldkit?: FoldkitInspector;
   readonly agent?: AgentConnection;
+  readonly sourceEvidence?: SourceEvidenceOptions;
 }
 
 export interface CreasekitHandle {
@@ -402,7 +404,10 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   const refreshEvidencePreview = async (): Promise<void> => {
     const feedback = state.feedback;
     const includeModel = state.includeModel;
-    const annotations = await enrichAnnotations(exportAnnotations());
+    const annotations = await enrichAnnotations(
+      exportAnnotations(),
+      options.sourceEvidence,
+    );
     if (destroyed || feedback !== state.feedback || includeModel !== state.includeModel)
       return;
     evidencePreview = { feedback, includeModel, annotations };
@@ -418,7 +423,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     const includeModel = state.includeModel;
     const captured = exportAnnotations();
     const annotations = captured.some(needsSourceEvidence)
-      ? await enrichAnnotations(captured)
+      ? await enrichAnnotations(captured, options.sourceEvidence)
       : captured;
     if (destroyed || (includeModel && !state.includeModel)) return;
     await copy(
@@ -438,12 +443,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       annotations.length > 0
         ? formatMarkdown(
             annotations.some(needsSourceEvidence)
-              ? await enrichAnnotations(annotations)
+              ? await enrichAnnotations(annotations, options.sourceEvidence)
               : annotations,
           )
         : JSON.stringify(
             needsSourceEvidence(selection)
-              ? await enrichSelection(selection)
+              ? await enrichSelection(selection, options.sourceEvidence)
               : selection,
             null,
             2,
@@ -489,7 +494,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       const snapshot =
         needsSourceEvidence(captured.selection) ||
         captured.annotations.some(needsSourceEvidence)
-          ? await enrichSnapshot(captured)
+          ? await enrichSnapshot(captured, options.sourceEvidence)
           : captured;
       if (
         destroyed ||
@@ -913,6 +918,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       panel.hidden = true;
       return;
     }
+    const deployedSource = context.source.verification === 'deployed-build';
     const heading = document.createElement('div');
     heading.className = 'creasekit-foldkit-heading';
     heading.innerHTML = `${icon('creasekit')}<strong>FoldKit</strong><span>${context.provenance === 'automatic-instrumentation' ? 'Automatic context' : 'Registered context'}</span>`;
@@ -922,7 +928,10 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     source.dataset.action = 'open-source';
     source.dataset.source = `${context.source.file}${context.source.line === undefined ? '' : `:${context.source.line}`}${context.source.column === undefined ? '' : `:${context.source.column}`}`;
     source.textContent = `${source.dataset.source} → ${context.source.view}`;
-    source.title = 'Open view source in your editor';
+    source.disabled = deployedSource;
+    source.title = deployedSource
+      ? 'Source from this deployed build; use Copy for agent'
+      : 'Open view source in your editor';
     panel.append(source, row('Scope', context.boundary));
     for (const [label, location] of [
       ['Element source', context.elementSource],
@@ -934,6 +943,9 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       link.dataset.action = 'open-source';
       link.dataset.source = `${location.file}:${location.line ?? 1}:${location.column ?? 1}`;
       link.textContent = `${label}: ${link.dataset.source}`;
+      link.disabled = deployedSource;
+      if (deployedSource)
+        link.title = 'Source from this deployed build; use Copy for agent';
       panel.append(link);
     }
     if (context.modelSource !== undefined)
@@ -951,11 +963,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     consent.textContent = state.includeModel
       ? 'Hide Model & history'
       : 'Include scoped Model & history';
-    panel.append(consent);
+    if (!deployedSource) panel.append(consent);
     const hint = document.createElement('p');
     hint.className = 'creasekit-subtitle';
-    hint.textContent =
-      'Opt-in fields may be captured in feedback and synced with your local agent. Model values are never saved to local storage.';
+    hint.textContent = deployedSource
+      ? 'This public demo uses bundled source evidence. Model capture and local-editor actions are unavailable.'
+      : 'Opt-in fields may be captured in feedback and synced with your local agent. Model values are never saved to local storage.';
     panel.append(hint);
     for (const reason of context.availability ?? []) {
       const note = document.createElement('p');
@@ -1180,7 +1193,9 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         savingNote = true;
         render();
         try {
-          annotation = (await enrichAnnotations([annotation]))[0] ?? annotation;
+          annotation =
+            (await enrichAnnotations([annotation], options.sourceEvidence))[0] ??
+            annotation;
         } finally {
           savingNote = false;
         }

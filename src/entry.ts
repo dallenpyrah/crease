@@ -1,6 +1,7 @@
 import { Runtime } from 'foldkit';
 
 import { mountCreasekit } from './creasekit';
+import { homepageInspector, homepageSourceEvidence } from './homepage-source-context';
 import { Message, Model, init, update, view } from './main';
 
 const application = Runtime.makeApplication({
@@ -15,7 +16,11 @@ const application = Runtime.makeApplication({
 Runtime.run(application);
 
 const creasekit = import.meta.env.PROD
-  ? mountCreasekit({ projectId: 'creasekit-homepage' })
+  ? mountCreasekit({
+      projectId: 'creasekit-homepage',
+      foldkit: homepageInspector,
+      sourceEvidence: homepageSourceEvidence,
+    })
   : undefined;
 
 if (import.meta.hot) {

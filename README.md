@@ -55,6 +55,8 @@ Drag the toolbar by its grip to reposition it, or focus the grip and use the arr
 
 Normal consumer production builds exclude the overlay, source instrumentation, and MCP bridge. Applications that intentionally own their overlay mount can keep the [optional manual integration](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md#existing-manual-integrations).
 
+The public creasekit homepage is a deliberate demo exception: its site-only build plugin embeds bounded source evidence from an explicit allowlist of this public repository's homepage files. Copied annotations identify the deployed build's source, not a live working tree. The static demo has no source-reading server or MCP bridge, and Model capture is disabled. This plugin is not part of the published `creasekit/vite` integration.
+
 ## Connect an MCP client
 
 Open the overlay's **Feedback** panel to review annotations and use the undoable **Clear all** action when needed. The automatic Vite integration keeps the current browser context synchronized to its local authenticated bridge while creasekit is mounted, so no share or stop-sharing action is required. Configure an MCP client to start the stdio server from the consuming application's configured Vite root:

@@ -15,6 +15,7 @@ const SourceStatus = Schema.Literals(['current', 'stale', 'unavailable']);
 
 const SourceDefinition = Schema.Struct({
   ...SourceSpan.fields,
+  verification: Schema.optionalKey(Schema.Literal('deployed-build')),
   snippet: Schema.optionalKey(Schema.String),
   snippetTruncated: Schema.optionalKey(Schema.Boolean),
   status: Schema.optionalKey(SourceStatus),
@@ -29,6 +30,7 @@ const SourceStyle = Schema.Struct({
 
 export const SourceEvidence = Schema.Struct({
   ...SourceSpan.fields,
+  verification: Schema.optionalKey(Schema.Literal('deployed-build')),
   snippet: Schema.optionalKey(Schema.String),
   snippetTruncated: Schema.optionalKey(Schema.Boolean),
   status: Schema.optionalKey(SourceStatus),

@@ -72,11 +72,17 @@ const formatSourceRange = (source: SourceSpan): string => {
 const formatSource = (source: SourceSpan): string =>
   `${formatSourceRange(source)} → ${plain(source.view)}`;
 
-const sourceStatus = (source: Pick<SourceEvidence, 'status' | 'snippet'>): string => {
+const sourceStatus = (
+  source: Pick<SourceEvidence, 'status' | 'snippet' | 'verification'>,
+): string => {
   switch (source.status) {
     case 'current':
+      if (source.verification === 'deployed-build')
+        return 'source status: current (verified against this deployed build, not a live working tree)';
       return 'source status: current (revision verified)';
     case 'stale':
+      if (source.verification === 'deployed-build')
+        return 'source status: stale (captured evidence does not match this deployed build)';
       return 'source status: stale (captured evidence may not match the current file)';
     case 'unavailable':
       return source.snippet === undefined
