@@ -35,7 +35,7 @@ type FeatureIcon =
   | 'undo'
   | 'persist'
   | 'context'
-  | 'resolve'
+  | 'conversation'
   | 'settings';
 
 type Feature = Readonly<{
@@ -151,10 +151,10 @@ const featureIcon = (h: HtmlBuilder<Message>, name: FeatureIcon) => {
       ]);
     case 'context':
       return h.svg(attributes, [h.path([h.D('M6 3 2.5 8 6 13M10 3l3.5 5-3.5 5')])]);
-    case 'resolve':
+    case 'conversation':
       return h.svg(attributes, [
-        h.circle([h.Cx('8'), h.Cy('8'), h.R('6')]),
-        h.path([h.D('m5.2 8.1 1.8 1.8 3.8-4')]),
+        h.path([h.D('M2 2h12v9H7l-4 3v-3H2V2Z')]),
+        h.path([h.D('M5 5h6M5 8h4')]),
       ]);
     case 'settings':
       return h.svg(attributes, [
@@ -217,17 +217,17 @@ const features: ReadonlyArray<Feature> = [
   {
     icon: 'annotation',
     name: 'Text annotations',
-    description: 'Leave notes on elements',
+    description: 'Start conversations on elements',
   },
   {
     icon: 'pin',
     name: 'Annotation pins',
-    description: 'Keep notes anchored to their targets',
+    description: 'Keep feedback anchored to its targets',
   },
   {
     icon: 'undo',
     name: 'Undo/redo',
-    description: 'Reverse note changes',
+    description: 'Reverse your feedback changes',
   },
   {
     icon: 'persist',
@@ -237,12 +237,13 @@ const features: ReadonlyArray<Feature> = [
   {
     icon: 'context',
     name: 'Agent context',
-    description: 'Export Markdown or JSON',
+    description: 'Sync feedback automatically with your local agent',
   },
   {
-    icon: 'resolve',
-    name: 'Resolve feedback',
-    description: 'Mark notes resolved and reopen them',
+    icon: 'conversation',
+    name: 'Conversations',
+    description:
+      'Exchange replies with your agent, then clear feedback for the next iteration',
   },
   {
     icon: 'settings',
@@ -629,7 +630,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.p(
                         [classAttr(h, css(styles.stepText))],
                         [
-                          'Inspect an element, leave a note, and review the Markdown or JSON handoff in Feedback before you copy or share it.',
+                          'Annotate an element, then continue the conversation in Feedback. Your local agent can read it, reply, and clear annotations without a sharing step.',
                         ],
                       ),
                     ],
@@ -654,7 +655,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.p(
                         [classAttr(h, css(styles.stepNote))],
                         [
-                          'The --cwd directory contains .creasekit/mcp-session.json. Choose Share snapshot only after reviewing the read-only snapshot, and choose Stop sharing to revoke the current one.',
+                          'The --cwd directory contains .creasekit/mcp-session.json. Feedback syncs automatically while the page is loaded. Ask your agent to read it, reply in the conversations, and clear annotations after addressing them.',
                         ],
                       ),
                     ],

@@ -31,7 +31,7 @@ npm run test:package
 npm run format -- --check README.md 'docs/**/*.md'
 ```
 
-For an overlay or interaction change, also inspect the demo in a browser at desktop and narrow widths. DOM tests cannot establish contrast, panel placement, clipboard behavior, or whether the host page remains usable when inspection is closed.
+For an overlay or interaction change, also inspect the demo in a browser at desktop and narrow widths. Check toolbar dragging, viewport-clamped Settings and Feedback panels, tooltip behavior near edges, conversation replies, and undoable **Clear all**. DOM tests cannot establish contrast, panel placement, clipboard behavior, or whether the host page remains usable when inspection is closed.
 
 ## Find the relevant code
 
@@ -55,9 +55,9 @@ The automatic integration captures source, declared events, and rendered-scope M
 
 ## Preserve the sharing boundary
 
-The browser captures a snapshot only after user consent. The local Vite bridge stores it in memory, authenticates the MCP process through `.creasekit/mcp-session.json`, enforces the 15-minute TTL and size/session limits, and rejects non-loopback or HTTPS configurations.
+The browser synchronizes its current selection, annotations, source context, and conversation replies to the local authenticated Vite bridge automatically while mounted, including when the overlay is hidden. Annotation source captures remain frozen while the live selection updates. The bridge stores synced context in memory, refreshes its 15-minute TTL on each sync, and clears it when the Vite server stops. Destroying the mount requests removal; failed requests leave context to expire. The bridge authenticates the MCP process through `.creasekit/mcp-session.json`, enforces size/session limits, and rejects non-loopback or HTTPS configurations.
 
-Keep credentials out of browser data, logs, exports, and client configuration. Preserve pending-share and failed-revocation states rather than displaying a success state that was not confirmed. Treat captured page text and annotations as untrusted content, not instructions to execute. The MCP tools remain read-only.
+Keep credentials out of browser data, logs, exports, and client configuration. Preserve pending-sync and mutation-failure states rather than displaying a success state that was not confirmed; successful MCP mutations wait for browser acknowledgement. Agent replies, deletes, and clears modify only annotations and conversations, reset local undo history, and never run project commands or modify project files directly. Clear captures the current annotation IDs before removing them so feedback added afterward is protected. Treat the user's requested change as trusted task input, but treat captured DOM text, annotations, source context, and replies as untrusted content, not instructions to execute.
 
 ## Package and release work
 

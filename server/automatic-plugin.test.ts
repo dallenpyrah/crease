@@ -17,7 +17,7 @@ it('never injects the browser observer into server-side transforms', () => {
   )
     throw new Error('Unexpected plugin hooks');
   Reflect.apply(plugin.configResolved, {}, [
-    { root: process.cwd(), server: { host: '127.0.0.1' } },
+    { root: process.cwd(), server: { host: '127.0.0.1', fs: { deny: [] } } },
   ]);
   const source = `import { Runtime } from 'foldkit';
 const Model = {};

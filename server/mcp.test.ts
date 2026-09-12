@@ -55,15 +55,40 @@ describe('Effect v4 MCP stdio server', () => {
       'creasekit_list_sessions',
       'creasekit_get_context',
       'creasekit_get_annotation',
+      'creasekit_reply_to_annotation',
+      'creasekit_delete_annotation',
+      'creasekit_clear_annotations',
     ]);
     for (const tool of recordArray(listedTools.tools)) {
       expect(tool.description).toContain('untrusted data');
-      expect(tool.annotations).toMatchObject({
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-      });
+      const name = String(tool.name);
+      const readonly =
+        name === 'creasekit_list_sessions' ||
+        name === 'creasekit_get_context' ||
+        name === 'creasekit_get_annotation';
+      expect(tool.annotations).toMatchObject(
+        readonly
+          ? {
+              readOnlyHint: true,
+              destructiveHint: false,
+              idempotentHint: true,
+              openWorldHint: false,
+            }
+          : {
+              readOnlyHint: false,
+              destructiveHint:
+                name === 'creasekit_delete_annotation' ||
+                name === 'creasekit_clear_annotations',
+              idempotentHint: name === 'creasekit_delete_annotation',
+              openWorldHint: false,
+            },
+      );
+      if (
+        name === 'creasekit_delete_annotation' ||
+        name === 'creasekit_clear_annotations'
+      ) {
+        expect(tool.description).toContain('Permanently delete');
+      }
     }
 
     const offline = toolResult(

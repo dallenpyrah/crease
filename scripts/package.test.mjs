@@ -273,9 +273,12 @@ test(
             client.notify('notifications/initialized');
             const tools = await client.request('tools/list', {});
             assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), [
+              'creasekit_clear_annotations',
+              'creasekit_delete_annotation',
               'creasekit_get_annotation',
               'creasekit_get_context',
               'creasekit_list_sessions',
+              'creasekit_reply_to_annotation',
             ]);
             const listed = await client.request('tools/call', {
               name: 'creasekit_list_sessions',

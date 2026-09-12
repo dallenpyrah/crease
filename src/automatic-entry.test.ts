@@ -9,6 +9,10 @@ const disposals: Array<() => void> = [];
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', new Storage());
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(new Response(null, { status: 404 })),
+  );
   document.body.replaceChildren();
 });
 

@@ -28,9 +28,7 @@ button svg { width: 17px; height: 17px; flex-shrink: 0; }
 .creasekit-toolbar .creasekit-launcher { background: #f1f2f4; color: #353b44; }
 .creasekit-launcher svg { width: 21px; height: 21px; }
 .creasekit-divider { align-self: stretch; width: 1px; margin: -4px 4px; background: #e9e9e9; }
-.creasekit-toolbar [data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 13px); left: 0; width: max-content; padding: 5px 8px; border-radius: 5px; background: #23252a; color: #fff; font-size: 11px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s; box-shadow: 0 2px 6px #0002; }
-.creasekit-toolbar [data-tip]:hover::after, .creasekit-toolbar [data-tip]:focus-visible::after { opacity: 1; visibility: visible; transition-delay: .35s; }
-.creasekit-toolbar button:last-child::after { left: auto; right: 0; }
+.creasekit-tooltip { position: fixed; width: max-content; max-width: calc(100vw - 16px); padding: 5px 8px; border-radius: 5px; background: #23252a; color: #fff; font-size: 11px; pointer-events: none; box-shadow: 0 2px 6px #0002; overflow-wrap: anywhere; }
 .creasekit-count { position: absolute; top: -2px; right: -2px; display: grid; place-items: center; min-width: 14px; height: 14px; padding: 0 3px; border: 2px solid #fff; border-radius: 10px; background: #009dff; color: #fff; font-size: 8px; }
 .creasekit-panel { position: fixed; width: min(320px, calc(100vw - 24px)); max-height: calc(100vh - 92px); overflow: auto; border: 1px solid #e3e3e3; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px #00000014, 0 7px 24px #00000014; pointer-events: auto; }
 .creasekit-card { top: 74px; left: 16px; }
@@ -68,7 +66,6 @@ button svg { width: 17px; height: 17px; flex-shrink: 0; }
 .creasekit-card-hint { margin: 0; color: #a1a5ad; font-size: 10px; }
 .creasekit-pin { position: fixed; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 2px solid #fff; border-radius: 50% 50% 50% 4px; box-shadow: 0 2px 5px #007ab440; background: #009dff; color: #fff; font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: auto; }
 .creasekit-pin:hover { transform: scale(1.15); }
-.creasekit-pin.is-resolved { background: #929ba5; }
 .creasekit-output { left: 16px; top: 70px; width: min(400px, calc(100vw - 24px)); }
 .creasekit-output-head, .creasekit-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #eff0f2; }
 .creasekit-output-title { font-size: 12px; font-weight: 500; margin: 0; }
@@ -83,11 +80,17 @@ button svg { width: 17px; height: 17px; flex-shrink: 0; }
 .creasekit-list-item { border: 1px solid #e9ecf0; border-radius: 8px; padding: 10px; }
 .creasekit-list-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #9297a0; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .creasekit-list-target { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: none; color: #5a6575; text-align: left; font: inherit; }
-.creasekit-list-item-status { font: 10px Inter, sans-serif; }
-.creasekit-list-item-status.is-open { color: #0096ee; }
 .creasekit-list-item-comment { margin: 9px 0; color: #434a54; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.creasekit-conversation-author { margin-top: 10px; color: #626d7e; font-size: 10px; }
 .creasekit-list-item-actions { display: flex; gap: 5px; }
 .creasekit-list-item-actions .creasekit-action { min-height: 24px; padding: 3px 6px; font-size: 10px; }
+.creasekit-conversation { display: grid; gap: 8px; margin-top: 10px; }
+.creasekit-message { padding: 8px 10px; border-radius: 7px; background: #f5f6f8; }
+.creasekit-message.is-agent { background: #eef7fd; }
+.creasekit-message strong { color: #626d7e; font-size: 10px; font-weight: 500; }
+.creasekit-message p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.creasekit-reply { display: block; width: 100%; min-height: 52px; max-height: 150px; resize: vertical; margin-top: 10px; padding: 8px; border: 1px solid #e1e5ea; border-radius: 6px; background: #fff; color: #434a54; }
+.creasekit-send-reply { margin-top: 6px; }
 .creasekit-empty { padding: 25px 18px 30px; text-align: center; color: #959ba5; }
 .creasekit-empty svg { display: block; width: 28px; height: 28px; margin: 0 auto 12px; color: #bbc2cd; }
 .creasekit-empty strong { display: block; color: #454d59; font-size: 12px; font-weight: 500; }

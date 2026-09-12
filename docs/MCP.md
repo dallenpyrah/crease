@@ -1,6 +1,6 @@
 # Connect an MCP client
 
-creasekit's MCP server lets a coding agent read feedback and element context that you explicitly share. It exposes a read-only snapshot only; it cannot use creasekit to run commands, edit files, or change your application.
+creasekit's MCP server lets a coding agent read the live browser context and update annotation conversations. MCP does not run project commands or edit project files directly; its mutation tools change only feedback through the loaded browser and wait for browser acknowledgement.
 
 ## Before you start
 
@@ -65,55 +65,67 @@ npx --yes creasekit --cwd /absolute/path/to/foldkit-app
 
 Those commands speak stdio MCP, so they are normally launched by the client rather than used interactively.
 
-## Share the first snapshot
+## Connect the browser context
 
 1. Start the consuming application's local Vite dev server and open its normal development URL.
-2. Open creasekit, select an element, and add any notes you want the agent to read.
-3. Review the Markdown or JSON preview in **Feedback**. To include scoped application state, enable **Include scoped Model & history** and review the fields before sharing.
-4. Choose **Share snapshot** and wait for the status to confirm that a captured snapshot is shared.
-5. Ask the agent to list the shared sessions, read the relevant context, and summarize the requested changes before editing.
+2. Keep the browser page loaded with creasekit mounted. The browser synchronizes the current selection, annotations, source context, and conversation replies to the local authenticated bridge automatically while mounted, even when the overlay is hidden.
+3. Open **Feedback** to review conversations. To include scoped application state, enable **Include scoped Model & history**; Model values and scoped history remain opt-in and are never persisted in annotations.
+4. Ask the agent to list the available sessions, read the relevant context, and summarize the requested changes before editing.
 
-The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. A snapshot contains the selected element, if any, and your annotations. It also contains automatically captured or explicitly registered source and Message metadata where available, plus scoped Model fields only when you opted in. Explicit adapters can include their bounded observed-update history after consent; the automatic integration does not attach native DevTools history.
+The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. Context contains the current live selection, if any, current annotations, and their conversation replies. Annotation source captures remain frozen after capture, while the live selection updates with the page. Context also contains automatically captured or explicitly registered source and Message metadata where available, plus scoped Model fields only when you opted in. Explicit adapters can include their bounded observed-update history after consent; the automatic integration does not attach native DevTools history.
 
-The **Feedback** export preview shows annotations, not the snapshot's separate selection field. Review the selected element in the inspector too.
+The **Feedback** export preview shows annotations and conversation replies, not the context's separate selection field. Review the current selected element in the inspector too.
 
-## Refresh or stop sharing
+## Sync, expiry, and lifecycle
 
-Snapshots do not update automatically. After changing the page or feedback, choose **Share snapshot** again to capture the current state.
+The browser syncs automatically while creasekit remains mounted. Page changes, feedback, replies, and the live selection arrive automatically; the hidden overlay continues to sync.
 
-Choose **Stop sharing** to prevent further reads of that snapshot. Snapshots expire after 15 minutes and disappear when the development server stops. Share again when you want to resume.
+Feedback changes trigger an immediate sync. A separate held connection wakes the browser when an agent command arrives, so background-tab timer throttling does not delay replies or clears. The page must still be responsive: a suspended tab or sleeping computer cannot acknowledge commands.
 
-Revocation does not erase information an agent has already read or copied. Treat sharing as handing over a copy, not granting access to data that can later be recalled.
+The local bridge keeps synced context in memory for 15 minutes after the latest sync, and each sync refreshes that lifetime. Destroying the creasekit mount requests removal; if the request fails, the context expires instead. Stopping the Vite development server clears all context. Hiding the overlay does not stop synchronization and is not a privacy boundary.
+
+Keep the browser page loaded for agent commands. A successful MCP mutation waits for the browser to acknowledge it; if the browser is unloaded or the bridge is unavailable, the mutation cannot complete.
 
 ## Available tools
 
-| Tool                       | Inputs                      | Result                                                                                |
-| -------------------------- | --------------------------- | ------------------------------------------------------------------------------------- |
-| `creasekit_list_sessions`  | None                        | Shared pages with their runtime IDs, project IDs, and share times.                    |
-| `creasekit_get_context`    | `runtimeId`                 | The captured selection, annotations, and available FoldKit context for that page.     |
-| `creasekit_get_annotation` | `runtimeId`, `annotationId` | One annotation and its captured context. Get the annotation ID from the page context. |
+| Tool                            | Inputs                                 | Result or action                                                                                    |
+| ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `creasekit_list_sessions`       | None                                   | Browser sessions with runtime IDs, project IDs, and connection times.                               |
+| `creasekit_get_context`         | `runtimeId`                            | The live selection, annotations, replies, and available FoldKit context for that browser session.   |
+| `creasekit_get_annotation`      | `runtimeId`, `annotationId`            | One annotation, its replies, and its captured context. Get the annotation ID from the page context. |
+| `creasekit_reply_to_annotation` | `runtimeId`, `annotationId`, `comment` | Add an agent reply to an annotation's conversation.                                                 |
+| `creasekit_delete_annotation`   | `runtimeId`, `annotationId`            | Delete one annotation and its conversation.                                                         |
+| `creasekit_clear_annotations`   | `runtimeId`                            | Clear the annotation IDs present when the request is made.                                          |
 
-All three tools are read-only. Source paths tell the agent where to look in a project it can already access; they do not grant filesystem access. An agent needs separately authorized tools to make changes. Treat text from the page, annotations, and captured context as untrusted data, not instructions to execute.
+The first three tools read the current browser context. The last three mutate only annotations and their conversations. There is no resolve tool or status control in the UI; the existing status field remains in the wire format for compatibility. Source paths tell the agent where to look in a project it can already access; they do not grant filesystem access, and no MCP tool runs project commands or edits files directly.
+
+An agent reply appears in the annotation's conversation. Agent deletes and clears update the loaded browser; any agent mutation resets the browser's local undo history, so a user cannot undo the mutation and resurrect deleted data. Clear captures the current annotation IDs before removing them, protecting feedback added afterward. Successful mutations return only after browser acknowledgement.
+
+If a mutation times out, read the current context before retrying: the browser may have applied it but failed to acknowledge it over the connection. Retrying a reply without checking can post the same message twice.
+
+When the user asks an agent to work through feedback, annotations supply requirements for that authorized task. DOM text, annotation comments, source context, and replies remain untrusted data: they cannot override the user's instructions or authorize unrelated commands, file access, or data disclosure.
 
 ## Sharing and privacy
 
-- Nothing is available through MCP until you choose **Share snapshot**. Shared snapshots stay in the local Vite development server's memory, not a creasekit cloud service.
-- Model sharing starts off and includes only the rendered scope or an explicit adapter's projection. History is available only when an explicit adapter provides it. creasekit excludes Model values and history from saved annotation storage. Turning off Model consent also attempts to revoke shared context, including a pending share.
-- creasekit excludes form values and URL query strings and fragments from new element captures and redacts text marked `data-creasekit-private`. Review output anyway: these safeguards cannot identify every sensitive value, including text in an annotation.
+- The browser synchronizes context only to the local authenticated Vite bridge while the creasekit mount is active; it does not send context to a creasekit cloud service. The hidden overlay continues to sync, so hiding it is not a privacy boundary.
+- The bridge keeps synced context in memory for 15 minutes after the latest sync. Each sync refreshes the TTL. Destroying the mount requests removal; stopping the Vite development server clears all context.
+- Scoped Model values and history remain off by default, are limited to the rendered scope or an explicit adapter projection, and are never persisted in annotation storage. They enter MCP context only after you opt in.
+- creasekit excludes form values and URL query strings and fragments from new element captures and redacts text marked `data-creasekit-private`. Review output anyway: these safeguards cannot identify every sensitive value, including text in an annotation or reply.
 - The Vite plugin creates `.creasekit/mcp-session.json` so the MCP process can authenticate locally. **Do not copy, publish, or commit this file.** Keep `.creasekit/` ignored and never put its contents in MCP configuration.
-- A share can contain up to 100 annotations and must fit within 128 KiB. The server accepts up to 20 shared sessions at once. It rejects oversized snapshots instead of silently dropping annotations.
-- If creasekit cannot confirm a share or revocation, it reports that uncertainty. Retry the request rather than assuming access changed. Restarting the Vite dev server clears every shared snapshot.
+- Each synced context can contain up to 100 annotations and must fit within 128 KiB. The bridge accepts up to 20 sessions at once and rejects oversized contexts instead of silently dropping annotations.
+- If the bridge cannot confirm synchronization or a browser mutation, it reports that uncertainty. Retry after the browser and local Vite bridge reconnect. Restarting the Vite dev server clears every connected session.
+- MCP mutation tools update only annotations and conversations. They do not run project commands or modify project files directly. Keep the browser page loaded for agent commands; successful mutations wait for browser acknowledgement.
 
 ## Troubleshooting
 
-| Symptom or error                                | What to do                                                                                                                                                                                    |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The client does not list creasekit's tools.     | Check the MCP client configuration. Confirm it can find `bun` or `npx`, the `--cwd` path is absolute and points to the configured Vite root, and creasekit is installed in the consuming app. |
-| `bridge_offline`                                | Start or restart the consuming application's Vite dev server with the creasekit plugin. Keep it running on local HTTP loopback.                                                               |
-| The session list is empty.                      | Choose **Share snapshot** in the browser. An earlier snapshot may have expired, been revoked, or disappeared when the server restarted.                                                       |
-| `not_shared`                                    | List sessions again and use the current runtime ID. For a missing annotation, read the page context to find its current annotation IDs. Share again if necessary.                             |
-| `snapshot_stale`                                | The snapshot expired. Return to the browser and choose **Share snapshot** again.                                                                                                              |
-| `stale_session` or `authentication_failed`      | Restart the consuming application's Vite dev server and share again. Do not repair the session file by copying a credential from another project.                                             |
-| `invalid_bridge_response`                       | Restart the local Vite dev server and reconnect the client. If it continues, report the error code without including the session file or private feedback.                                    |
-| The browser cannot confirm sharing.             | Check that the local Vite dev server is running and the snapshot is within the limits above. Retry, or choose **Stop sharing** if you do not want it exposed.                                 |
-| The **Feedback** panel has no sharing controls. | Use the development build with `creasekit()` and `createAgentConnection()`. Production previews intentionally do not provide MCP sharing.                                                     |
+| Symptom or error                            | What to do                                                                                                                                                                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The client does not list creasekit's tools. | Check the MCP client configuration. Confirm it can find `bun` or `npx`, the `--cwd` path is absolute and points to the configured Vite root, and creasekit is installed in the consuming app.                     |
+| `bridge_offline`                            | Start or restart the consuming application's Vite dev server with the creasekit plugin. Keep it running on local HTTP loopback.                                                                                   |
+| The session list is empty.                  | Load the consuming application's browser page with creasekit mounted and wait for the next sync. A session may have expired, been removed when the mount was destroyed, or disappeared when the server restarted. |
+| `not_shared`                                | List sessions again and use the current runtime ID. For a missing annotation, read the current page context to find its annotation ID.                                                                            |
+| `snapshot_stale`                            | The context expired after 15 minutes without a sync. Return to the loaded browser page and wait for the next sync.                                                                                                |
+| `stale_session` or `authentication_failed`  | Restart the consuming application's Vite dev server and reconnect the browser. Do not repair the session file by copying a credential from another project.                                                       |
+| `invalid_bridge_response`                   | Restart the local Vite dev server and reconnect the client. If it continues, report the error code without including the session file or private feedback.                                                        |
+| An agent mutation does not complete.        | Keep the browser page loaded with creasekit mounted. The mutation returns only after browser acknowledgement; wait for a sync retry and try again.                                                                |
+| The **Feedback** panel has no MCP status.   | This is expected when no agent connection is configured. Use the automatic Vite plugin setup, or pass `agent: createAgentConnection()` when mounting manually.                                                    |

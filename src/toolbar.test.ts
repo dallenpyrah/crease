@@ -5,6 +5,7 @@ let handle: CreasekitHandle | undefined;
 afterEach(() => {
   handle?.destroy();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 const mount = () => {
@@ -113,4 +114,69 @@ it('moves with arrow keys and keeps the position after hiding and restoring', ()
   shortcut('KeyH');
   shortcut('KeyH');
   expect(toolbar.style.left).toBe('56px');
+});
+
+it('anchors settings and feedback to the toolbar and flips panels above near the bottom', () => {
+  const { root, toolbar, grip } = mount();
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(16, 16, 420, 42),
+  );
+  const settings = root.querySelector<HTMLElement>('.creasekit-settings')!;
+  const output = root.querySelector<HTMLElement>('.creasekit-output')!;
+  vi.spyOn(settings, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(16, 70, 320, 300),
+  );
+  vi.spyOn(output, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(16, 70, 400, 300),
+  );
+  root.querySelector<HTMLButtonElement>('[data-action="settings"]')!.click();
+  grip.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      shiftKey: true,
+      bubbles: true,
+      composed: true,
+    }),
+  );
+  expect(settings.style.top).toBe('106px');
+  handle!.showOutput();
+  expect(output.style.top).toBe('106px');
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(16, window.innerHeight - 82, 420, 42),
+  );
+  grip.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      shiftKey: true,
+      bubbles: true,
+      composed: true,
+    }),
+  );
+  expect(output.style.top).toBe(`${window.innerHeight - 350}px`);
+});
+
+it('keeps tooltips within the viewport and suppresses them during dragging', () => {
+  vi.useFakeTimers();
+  const { root, grip } = mount();
+  const button = root.querySelector<HTMLButtonElement>('[data-action="hide"]')!;
+  const tooltip = root.querySelector<HTMLElement>('.creasekit-tooltip')!;
+  vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, window.innerHeight - 32, 32, 32),
+  );
+  vi.spyOn(tooltip, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 200, 30),
+  );
+  button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  vi.advanceTimersByTime(350);
+  expect(tooltip.hidden).toBe(false);
+  expect(tooltip.style.left).toBe('8px');
+  expect(tooltip.style.top).toBe(`${window.innerHeight - 70}px`);
+  Object.assign(grip, { setPointerCapture: vi.fn(), hasPointerCapture: () => false });
+  grip.dispatchEvent(
+    new PointerEvent('pointerdown', { pointerId: 1, isPrimary: true, bubbles: true }),
+  );
+  button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  vi.advanceTimersByTime(500);
+  expect(tooltip.hidden).toBe(true);
+  expect(grip.hasAttribute('data-tip')).toBe(false);
 });

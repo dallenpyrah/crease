@@ -259,7 +259,12 @@ describe('creasekit overlay interactions', () => {
     remount({ foldkit: foldkit(), agent: { share, unshare } });
     target.click();
     expect(root.querySelector('.creasekit-model-code')).toBeNull();
-    expect(share).not.toHaveBeenCalled();
+    expect(share.mock.calls[0]?.[0].selection).toBeNull();
+    await vi.waitFor(() =>
+      expect(element('.creasekit-agent-status').textContent).toContain(
+        'available to your agent',
+      ),
+    );
     click('toggle-model');
     expect(element('.creasekit-model-code').textContent).toContain('3');
     click('compose');
@@ -272,20 +277,20 @@ describe('creasekit overlay interactions', () => {
     expect(stored[0].foldkit.model).toBeUndefined();
     expect(stored[0].foldkit.history).toBeUndefined();
     click('open-output');
-    click('share');
     await vi.waitFor(() =>
-      expect(element('.creasekit-agent-status').textContent).toContain(
-        'snapshot is shared',
-      ),
+      expect(share.mock.calls.at(-1)?.[0].annotations).toHaveLength(1),
     );
-    expect(share).toHaveBeenCalledOnce();
-    expect(share.mock.calls[0]?.[0].selection.foldkit.model).toEqual({ count: 3 });
-    expect(share.mock.calls[0]?.[0].annotations[0].foldkit.model).toEqual({ count: 3 });
+    expect(share.mock.calls.at(-1)?.[0].selection.foldkit.model).toEqual({ count: 3 });
+    expect(share.mock.calls.at(-1)?.[0].annotations[0].foldkit.model).toEqual({
+      count: 3,
+    });
     click('settings');
     const input = element<HTMLInputElement>('[data-setting="model"]');
     input.checked = false;
     input.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => expect(unshare).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(share.mock.calls.at(-1)?.[0].annotations[0].foldkit.model).toBeUndefined(),
+    );
     click('open-output');
     element<HTMLButtonElement>('[data-output-format="json"]').click();
     expect(JSON.parse(output())[0].foldkit.model).toBeUndefined();
@@ -307,19 +312,23 @@ describe('creasekit overlay interactions', () => {
     const pending = new Promise<void>((resolve) => {
       finishShare = resolve;
     });
-    const share = vi.fn(() => pending);
+    const share = vi.fn(() => pending).mockResolvedValueOnce(undefined);
     const unshare = vi.fn().mockResolvedValue(undefined);
     remount({ foldkit: foldkit(), agent: { share, unshare } });
+    await vi.waitFor(() =>
+      expect(element('.creasekit-agent-status').textContent).toContain(
+        'available to your agent',
+      ),
+    );
     target.click();
     click('toggle-model');
     click('open-output');
-    click('share');
     click('settings');
     const input = element<HTMLInputElement>('[data-setting="model"]');
     input.checked = false;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     finishShare();
     await vi.waitFor(() => expect(unshare).toHaveBeenCalledOnce());
-    expect(element<HTMLButtonElement>('[data-action="unshare"]').hidden).toBe(true);
+    expect(root.querySelector('[data-action="unshare"]')).toBeNull();
   });
 });

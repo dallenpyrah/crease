@@ -48,6 +48,14 @@ export type Capture = typeof Capture.Type;
 export const AnnotationStatus = Schema.Literals(['open', 'resolved']);
 export type AnnotationStatus = typeof AnnotationStatus.Type;
 
+export const AnnotationReply = Schema.Struct({
+  id: Schema.String,
+  author: Schema.Literals(['user', 'agent']),
+  comment: Schema.String,
+  createdAt: Schema.Number,
+});
+export type AnnotationReply = typeof AnnotationReply.Type;
+
 export const Annotation = Schema.Struct({
   version: Schema.Literal(1),
   id: Schema.String,
@@ -57,6 +65,7 @@ export const Annotation = Schema.Struct({
   capture: Capture,
   createdAt: Schema.Number,
   updatedAt: Schema.Number,
+  replies: Schema.optionalKey(Schema.Array(AnnotationReply)),
   foldkit: Schema.optionalKey(FoldkitContext),
 });
 export type Annotation = typeof Annotation.Type;

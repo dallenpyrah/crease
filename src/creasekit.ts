@@ -1,6 +1,10 @@
 import { Clock, Effect } from 'effect';
 
-import type { AgentConnection, AgentSnapshot } from './agent-contract.js';
+import {
+  AGENT_COMMAND_TIMEOUT_MS,
+  type AgentConnection,
+  type AgentSnapshot,
+} from './agent-contract.js';
 import { type Annotation, makeAnnotation, redactedPageUrl } from './domain.js';
 import { formatJson, formatMarkdown } from './export.js';
 import * as Feedback from './feedback.js';
@@ -56,9 +60,6 @@ interface State {
   alt: boolean;
   includeModel: boolean;
   storageError: boolean;
-  shared: boolean;
-  sharing: boolean;
-  shareError: boolean;
   copyFallback: string | null;
 }
 
@@ -129,33 +130,33 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           <textarea aria-label="Feedback" placeholder="What should change about this element?" maxlength="4000"></textarea>
           <div class="creasekit-actions"><span class="creasekit-card-hint">⌘ ↵ to save</span>
             <button class="creasekit-action" data-action="cancel-composer">Cancel</button>
-            <button class="creasekit-action is-primary" data-action="add">Add note</button>
+            <button class="creasekit-action is-primary" data-action="add">Add feedback</button>
           </div>
         </div>
         <div class="creasekit-actions creasekit-card-actions">
           ${actionButton('copy-selected', 'copy', 'Copy element')}
-          ${actionButton('compose', 'note', 'Add a note')}
+          ${actionButton('compose', 'note', 'Add feedback')}
         </div>
       </section>
       <section class="creasekit-panel creasekit-output" hidden aria-label="Agent context">
         <div class="creasekit-output-head">
-          <div><h2 class="creasekit-output-title">Feedback</h2><p class="creasekit-subtitle">Local notes. You choose what to share.</p></div>
+          <div><h2 class="creasekit-output-title">Feedback</h2><p class="creasekit-subtitle">Conversations with your agent, right on the page.</p></div>
           <button class="creasekit-close" data-action="close-output" aria-label="Close feedback">${icon('close')}</button>
         </div>
         <div class="creasekit-tabs" role="tablist" aria-label="Feedback format">
-          <button role="tab" data-output-format="notes" aria-controls="creasekit-notes">Notes</button>
+          <button role="tab" data-output-format="notes" aria-controls="creasekit-notes">Conversations</button>
           <button role="tab" data-output-format="markdown" aria-controls="creasekit-export">Markdown</button>
           <button role="tab" data-output-format="json" aria-controls="creasekit-export">JSON</button>
         </div>
-        <div class="creasekit-list" id="creasekit-notes" role="tabpanel" aria-label="Notes"></div>
+        <div class="creasekit-list" id="creasekit-notes" role="tabpanel" aria-label="Conversations"></div>
         <pre class="creasekit-output-code" id="creasekit-export" role="tabpanel" aria-label="Export preview" tabindex="0" hidden></pre>
-        <div class="creasekit-storage-warning" role="status" hidden>Storage unavailable. Notes are in memory only; copy them before closing.</div>
+        <div class="creasekit-storage-warning" role="status" hidden>Storage unavailable. Feedback is in memory only; copy it before closing.</div>
         <div class="creasekit-agent" hidden>
-          <div><strong>creasekit MCP</strong><p class="creasekit-agent-status">Share a read-only snapshot with your local agent.</p></div>
-          <div class="creasekit-actions">${actionButton('unshare', 'close', 'Stop sharing')}${actionButton('share', 'output', 'Share snapshot')}</div>
+          <p class="creasekit-agent-status" role="status">Connecting to your local agent bridge…</p>
         </div>
         <div class="creasekit-output-footer">
           <div class="creasekit-output-actions">
+            ${actionButton('clear-annotations', 'trash', 'Clear all')}
             <button class="creasekit-close" data-action="undo" aria-label="Undo annotation change" title="Undo (⌘ Z)">${icon('undo')}</button>
             <button class="creasekit-close" data-action="redo" aria-label="Redo annotation change" title="Redo (⌘ ⇧ Z)">${icon('redo')}</button>
           </div>
@@ -169,13 +170,13 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           <label class="creasekit-setting">Viewport rulers<input type="checkbox" data-setting="rulers"></label>
           <label class="creasekit-setting creasekit-model-setting" hidden>Include scoped Model & history<input type="checkbox" data-setting="model"></label>
           <p class="creasekit-subtitle creasekit-model-setting" hidden>Only scoped, sanitized Model fields are included. Model values stay out of local storage.</p>
-          <p class="creasekit-subtitle">Notes persist locally. Visual settings apply to this session.</p>
+          <p class="creasekit-subtitle creasekit-sync-hint">Conversations persist locally. Visual settings apply to this session.</p>
           <p class="creasekit-subtitle">Drag the toolbar grip to move it. Hide or restore everything with Alt+Shift+H.</p>
           <div class="creasekit-shortcuts"><span>Toggle creasekit</span><kbd>⌥ ⇧ C</kbd><span>Inspect / annotate</span><span><kbd>I</kbd> <kbd>N</kbd></span><span>Typography / color</span><span><kbd>A</kbd> <kbd>P</kbd></span><span>X-ray / rulers</span><span><kbd>X</kbd> <kbd>R</kbd></span><span>Distance to selected element</span><kbd>hold ⌥</kbd><span>Undo / redo note change</span><span><kbd>⌘ Z</kbd> <kbd>⌘ ⇧ Z</kbd></span><span>Dismiss / exit</span><kbd>esc</kbd></div>
         </div>
       </section>
       <div class="creasekit-toolbar" role="toolbar" aria-label="creasekit tools">
-        <button type="button" class="creasekit-drag" aria-label="Move toolbar" data-tip="Drag to move · arrow keys when focused">⠿</button>
+        <button type="button" class="creasekit-drag" aria-label="Move toolbar" aria-description="Drag to move, or use arrow keys when focused">⠿</button>
         <button class="creasekit-launcher" data-action="toggle-open" aria-label="Toggle creasekit" data-tip="Toggle creasekit · ⌥ ⇧ C">${icon('creasekit')}</button>
         <div class="creasekit-toolrow">
           ${tool('annotate', 'note', 'Annotate (N)')}<span class="creasekit-divider"></span>
@@ -190,6 +191,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         ${tool('hide', 'close', 'Hide creasekit (Alt+Shift+H)')}
       </div>
       <div class="creasekit-toast" role="status" aria-live="polite" hidden></div>
+      <div class="creasekit-tooltip" id="creasekit-tooltip" role="tooltip" hidden></div>
     </div>`;
 
   const persistence = makeLocalPersistence(options.projectId ?? 'default');
@@ -211,9 +213,6 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     alt: false,
     includeModel: false,
     storageError: false,
-    shared: false,
-    sharing: false,
-    shareError: false,
     copyFallback: null,
   };
   const runtimeId = Effect.runSync(Effect.sync(() => crypto.randomUUID()));
@@ -233,6 +232,8 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   const toolbar = get<HTMLElement>(shadow, '.creasekit-toolbar');
   const layer = get<HTMLElement>(shadow, '.creasekit-layer');
   const dragHandle = get<HTMLButtonElement>(shadow, '.creasekit-drag');
+  const tooltip = get<HTMLElement>(shadow, '.creasekit-tooltip');
+  const replyDrafts = new Map<string, string>();
   let hidden = false;
   let toolbarPosition: { x: number; y: number } | null = null;
   let drag: { pointerId: number; x: number; y: number } | null = null;
@@ -248,6 +249,44 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     toolbar.style.left = `${x}px`;
     toolbar.style.top = `${y}px`;
     if (toolbarPosition !== null) toolbarPosition = { x, y };
+    for (const panel of [output, get<HTMLElement>(shadow, '.creasekit-settings')]) {
+      if (panel.hidden) continue;
+      const below = Math.max(0, window.innerHeight - y - rect.height - 20);
+      const above = Math.max(0, y - 20);
+      panel.style.maxHeight = `${Math.max(0, window.innerHeight - 24)}px`;
+      const bounds = panel.getBoundingClientRect();
+      const useBelow = bounds.height <= below || below >= above;
+      panel.style.maxHeight = `${useBelow ? below : above}px`;
+      const height = Math.min(bounds.height, useBelow ? below : above);
+      panel.style.left = `${Math.max(12, Math.min(x, window.innerWidth - bounds.width - 12))}px`;
+      panel.style.top = `${useBelow ? y + rect.height + 8 : y - height - 8}px`;
+    }
+  };
+  let tooltipTimer: number | null = null;
+  let tooltipTarget: HTMLElement | null = null;
+  const hideTooltip = (): void => {
+    if (tooltipTimer !== null) window.clearTimeout(tooltipTimer);
+    tooltipTimer = null;
+    tooltip.hidden = true;
+    tooltipTarget?.removeAttribute('aria-describedby');
+    tooltipTarget = null;
+  };
+  const showTooltip = (event: Event): void => {
+    if (drag !== null || hidden || !(event.target instanceof Element)) return;
+    const target = event.target.closest<HTMLElement>('[data-tip]');
+    if (target === null || target === tooltipTarget) return;
+    hideTooltip();
+    tooltipTarget = target;
+    tooltipTimer = window.setTimeout(() => {
+      if (drag !== null || hidden || tooltipTarget !== target) return;
+      tooltip.textContent = target.dataset.tip ?? '';
+      tooltip.hidden = false;
+      const anchor = target.getBoundingClientRect();
+      const bounds = tooltip.getBoundingClientRect();
+      tooltip.style.left = `${Math.max(8, Math.min(anchor.x + anchor.width / 2 - bounds.width / 2, window.innerWidth - bounds.width - 8))}px`;
+      tooltip.style.top = `${Math.max(8, Math.min(anchor.bottom + bounds.height + 16 > window.innerHeight ? anchor.top - bounds.height - 8 : anchor.bottom + 8, window.innerHeight - bounds.height - 8))}px`;
+      target.setAttribute('aria-describedby', tooltip.id);
+    }, 350);
   };
   const controller = new AbortController();
   let frame: number | null = null;
@@ -255,6 +294,9 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   let layoutDirty = true;
   let selectedSelector = '';
   let destroyed = false;
+  let pageInactive = false;
+  let pageEpoch = 0;
+  let pageRemoval = Promise.resolve();
 
   const showToast = (message: string): void => {
     if (destroyed) return;
@@ -334,32 +376,31 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     };
   };
 
-  const unshare = async (): Promise<void> => {
-    if (options.agent === undefined || !state.shared || state.sharing) return;
-    state.sharing = true;
-    state.shareError = false;
-    render();
-    try {
-      await options.agent.unshare(runtimeId);
-      state.shared = false;
-      showToast('Shared snapshot removed from creasekit MCP');
-    } catch {
-      state.shareError = true;
-      showToast('Could not stop sharing. Retry while the local dev server is running.');
-    } finally {
-      state.sharing = false;
-      if (!destroyed) render();
+  let syncTimer: number | null = null;
+  let syncing = false;
+  let syncCompletion = Promise.resolve();
+  let syncAgain = false;
+  let watching = false;
+  const acknowledgedCommands = new Set<string>();
+  const syncFeedback = async (): Promise<void> => {
+    const agent = options.agent;
+    if (destroyed || pageInactive || agent === undefined) return;
+    if (syncing) {
+      syncAgain = true;
+      return syncCompletion;
     }
-  };
-
-  const share = async (): Promise<void> => {
-    if (options.agent === undefined || state.sharing) return;
-    state.sharing = true;
-    state.shareError = false;
+    if (syncTimer !== null) window.clearTimeout(syncTimer);
+    syncing = true;
+    let finishSync = (): void => {};
+    syncCompletion = new Promise<void>((resolve) => {
+      finishSync = resolve;
+    });
+    syncAgain = false;
     const includedModel = state.includeModel;
-    render();
+    const epoch = pageEpoch;
+    const acknowledgedCommandIds = [...acknowledgedCommands];
     try {
-      await options.agent.share({
+      const snapshot: AgentSnapshot = {
         version: 1,
         runtimeId,
         projectId: options.projectId ?? 'default',
@@ -367,23 +408,118 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         sharedAt: currentTime(),
         selection: selectedSnapshot(),
         annotations: exportAnnotations(),
-      });
-      if (destroyed || (includedModel && !state.includeModel)) {
-        await options.agent.unshare(runtimeId);
-        state.shared = false;
+      };
+      const commands =
+        agent.sync === undefined
+          ? (await agent.share(snapshot), [])
+          : (await agent.sync({ snapshot, acknowledgedCommandIds })).commands;
+      if (epoch !== pageEpoch) {
+        if (destroyed || pageInactive) await agent.unshare(runtimeId);
+        syncAgain = !destroyed && !pageInactive;
         return;
       }
-      state.shared = true;
-      showToast('Snapshot shared with creasekit MCP');
+      if (destroyed || pageInactive || (includedModel && !state.includeModel)) {
+        await agent.unshare(runtimeId);
+        syncAgain = !destroyed && !pageInactive;
+        return;
+      }
+      for (const id of acknowledgedCommandIds) acknowledgedCommands.delete(id);
+      let changed = false;
+      for (const command of commands) {
+        if (acknowledgedCommands.has(command.id)) continue;
+        if (command.createdAt + AGENT_COMMAND_TIMEOUT_MS <= currentTime()) {
+          acknowledgedCommands.add(command.id);
+          syncAgain = true;
+          continue;
+        }
+        const previous = state.feedback;
+        if (
+          command.type === 'reply' &&
+          command.annotationId !== undefined &&
+          command.comment !== undefined
+        )
+          state.feedback = Feedback.reply(state.feedback, command.annotationId, {
+            id: command.id,
+            author: 'agent',
+            comment: command.comment,
+            createdAt: command.createdAt,
+          }).model;
+        else if (command.type === 'delete' && command.annotationId !== undefined)
+          state.feedback = Feedback.remove(state.feedback, command.annotationId).model;
+        else if (command.type === 'clear')
+          state.feedback = Feedback.clear(
+            state.feedback,
+            command.annotationIds ?? [],
+          ).model;
+        changed ||= state.feedback !== previous;
+        acknowledgedCommands.add(command.id);
+        syncAgain = true;
+      }
+      if (changed) {
+        state.feedback = Feedback.initialModel(state.feedback.annotations);
+        state.copyFallback = null;
+        resetDeletedConversation();
+        persist();
+        render();
+      }
+      get<HTMLElement>(shadow, '.creasekit-agent-status').textContent =
+        agent.sync === undefined
+          ? 'Feedback is available to your agent. Update the connection to enable replies.'
+          : 'Synced with your local agent · replies appear here automatically.';
+      void watchFeedback();
     } catch {
-      state.shared = true;
-      state.shareError = true;
-      showToast(
-        'Sharing could not be confirmed. Retry or stop sharing to revoke the snapshot.',
-      );
+      if (!destroyed && !pageInactive)
+        get<HTMLElement>(shadow, '.creasekit-agent-status').textContent =
+          'Feedback could not sync. It stays local; retrying automatically…';
     } finally {
-      state.sharing = false;
-      if (!destroyed) render();
+      syncing = false;
+      finishSync();
+      if (!destroyed && !pageInactive) {
+        if (syncAgain) void syncFeedback();
+        else syncTimer = window.setTimeout(() => void syncFeedback(), 1000);
+      }
+    }
+  };
+
+  const watchFeedback = async (): Promise<void> => {
+    const agent = options.agent;
+    if (
+      watching ||
+      destroyed ||
+      pageInactive ||
+      agent?.watch === undefined ||
+      agent.sync === undefined
+    )
+      return;
+    watching = true;
+    try {
+      while (!destroyed && !pageInactive && options.agent === agent) {
+        await agent.watch(runtimeId, controller.signal);
+        if (!destroyed && !pageInactive) await syncFeedback();
+      }
+    } catch {
+      if (!destroyed && !pageInactive)
+        get<HTMLElement>(shadow, '.creasekit-agent-status').textContent =
+          'Agent bridge reconnecting. Feedback stays local until synchronization resumes.';
+    } finally {
+      watching = false;
+    }
+  };
+
+  const resetDeletedConversation = (): void => {
+    for (const id of replyDrafts.keys())
+      if (!state.feedback.annotations.some((annotation) => annotation.id === id))
+        replyDrafts.delete(id);
+    if (
+      state.editingId !== null &&
+      !state.feedback.annotations.some(
+        (annotation) => annotation.id === state.editingId,
+      )
+    ) {
+      state.editingId = null;
+      state.draft = '';
+      textarea.value = '';
+      state.composerOpen = false;
     }
   };
 
@@ -452,7 +588,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       )
         return;
       const pin = document.createElement('button');
-      pin.className = `creasekit-pin${annotation.status === 'resolved' ? ' is-resolved' : ''}`;
+      pin.className = 'creasekit-pin';
       pin.textContent = `${index + 1}`;
       pin.dataset.action = 'focus-note';
       pin.dataset.annotationId = annotation.id;
@@ -719,7 +855,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     const hint = document.createElement('p');
     hint.className = 'creasekit-subtitle';
     hint.textContent =
-      'Opt-in fields may be captured in notes and shared snapshots. Model values are never saved to local storage.';
+      'Opt-in fields may be captured in feedback and synced with your local agent. Model values are never saved to local storage.';
     panel.append(hint);
     for (const reason of context.availability ?? []) {
       const note = document.createElement('p');
@@ -754,14 +890,23 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   };
 
   const renderNotes = (): void => {
+    const scrollTop = list.scrollTop;
+    const focused = shadow.activeElement;
+    const focusedReply =
+      focused instanceof HTMLTextAreaElement ? focused.dataset.replyId : undefined;
+    const selectionStart =
+      focused instanceof HTMLTextAreaElement ? focused.selectionStart : 0;
+    const selectionEnd =
+      focused instanceof HTMLTextAreaElement ? focused.selectionEnd : 0;
     list.replaceChildren();
     if (state.feedback.annotations.length === 0) {
-      list.innerHTML = `<div class="creasekit-empty">${icon('note')}<strong>A little context goes a long way.</strong><p>Choose Annotate, click an element,<br>and leave your first note.</p></div>`;
+      list.innerHTML = `<div class="creasekit-empty">${icon('note')}<strong>Start a conversation.</strong><p>Choose Annotate, click an element,<br>and tell your agent what should change.</p></div>`;
       return;
     }
     state.feedback.annotations.forEach((annotation, index) => {
       const item = document.createElement('article');
       item.className = 'creasekit-list-item';
+      item.dataset.annotationId = annotation.id;
       const head = document.createElement('div');
       head.className = 'creasekit-list-item-head';
       const target = document.createElement('button');
@@ -769,29 +914,61 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       target.dataset.action = 'focus-note';
       target.dataset.annotationId = annotation.id;
       target.textContent = `${index + 1}. ${annotation.target.tag} · ${annotation.target.text || annotation.target.role}`;
-      const status = document.createElement('span');
-      status.className = `creasekit-list-item-status${annotation.status === 'open' ? ' is-open' : ''}`;
-      status.textContent =
-        findTarget(annotation) === null ? 'Detached' : annotation.status;
-      head.append(target, status);
+      head.append(target);
+      if (findTarget(annotation) === null) {
+        const detached = document.createElement('span');
+        detached.textContent = 'Detached';
+        head.append(detached);
+      }
       const comment = document.createElement('p');
       comment.className = 'creasekit-list-item-comment';
       comment.textContent = annotation.comment;
+      const author = document.createElement('div');
+      author.className = 'creasekit-conversation-author';
+      author.textContent = 'You';
       const actions = document.createElement('div');
       actions.className = 'creasekit-list-item-actions';
       actions.innerHTML =
-        actionButton(
-          'toggle-status',
-          'check',
-          annotation.status === 'open' ? 'Resolve' : 'Reopen',
-        ) +
         actionButton('edit-note', 'note', 'Edit') +
         actionButton('delete-annotation', 'trash', 'Delete');
       for (const button of actions.querySelectorAll('button'))
         button.dataset.annotationId = annotation.id;
-      item.append(head, comment, actions);
+      item.append(head, author, comment, actions);
+      const conversation = document.createElement('div');
+      conversation.className = 'creasekit-conversation';
+      conversation.setAttribute('aria-label', 'Conversation replies');
+      for (const reply of annotation.replies ?? []) {
+        const message = document.createElement('div');
+        message.className = `creasekit-message is-${reply.author}`;
+        const author = document.createElement('strong');
+        author.textContent = reply.author === 'agent' ? 'Agent' : 'You';
+        const body = document.createElement('p');
+        body.textContent = reply.comment;
+        message.append(author, body);
+        conversation.append(message);
+      }
+      const reply = document.createElement('textarea');
+      reply.className = 'creasekit-reply';
+      reply.dataset.replyId = annotation.id;
+      reply.setAttribute('aria-label', `Reply to annotation ${index + 1}`);
+      reply.placeholder = 'Reply to this conversation…';
+      reply.maxLength = 4000;
+      reply.rows = 2;
+      reply.value = replyDrafts.get(annotation.id) ?? '';
+      const send = document.createElement('button');
+      send.className = 'creasekit-action creasekit-send-reply';
+      send.dataset.action = 'reply';
+      send.dataset.annotationId = annotation.id;
+      send.textContent = 'Reply';
+      send.disabled = reply.value.trim().length === 0;
+      item.append(conversation, reply, send);
       list.append(item);
+      if (focusedReply === annotation.id) {
+        reply.focus({ preventScroll: true });
+        reply.setSelectionRange(selectionStart, selectionEnd);
+      }
     });
+    list.scrollTop = scrollTop;
   };
 
   function render(): void {
@@ -802,9 +979,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       `${state.open}`,
     );
     const count = get<HTMLElement>(shadow, '.creasekit-count');
-    const openCount = state.feedback.annotations.filter(
-      (annotation) => annotation.status === 'open',
-    ).length;
+    const openCount = state.feedback.annotations.length;
     count.textContent = `${openCount}`;
     count.hidden = openCount === 0;
     card.hidden =
@@ -818,7 +993,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     composer.hidden = !state.composerOpen;
     get<HTMLElement>(shadow, '.creasekit-card-actions').hidden = state.composerOpen;
     get<HTMLButtonElement>(shadow, '[data-action="add"]').textContent =
-      state.editingId === null ? 'Add note' : 'Save changes';
+      state.editingId === null ? 'Add feedback' : 'Save changes';
     get<HTMLButtonElement>(shadow, '[data-action="add"]').disabled =
       state.draft.trim().length === 0;
     renderDetails();
@@ -864,16 +1039,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       state.includeModel;
     get<HTMLElement>(shadow, '.creasekit-storage-warning').hidden = !state.storageError;
     get<HTMLElement>(shadow, '.creasekit-agent').hidden = options.agent === undefined;
-    get<HTMLButtonElement>(shadow, '[data-action="share"]').disabled = state.sharing;
-    get<HTMLButtonElement>(shadow, '[data-action="unshare"]').hidden = !state.shared;
-    get<HTMLButtonElement>(shadow, '[data-action="unshare"]').disabled = state.sharing;
-    get<HTMLElement>(shadow, '.creasekit-agent-status').textContent = state.sharing
-      ? 'Updating shared snapshot…'
-      : state.shareError
-        ? 'Shared state could not be confirmed. Retry or stop sharing.'
-        : state.shared
-          ? 'A captured snapshot is shared. Share again to refresh it.'
-          : 'Share a read-only snapshot with your local agent.';
+    get<HTMLElement>(shadow, '.creasekit-sync-hint').textContent =
+      options.agent === undefined
+        ? 'Conversations persist locally. Visual settings apply to this session.'
+        : 'Conversations persist locally and sync with your agent while this page is loaded, even when the toolbar is hidden.';
+    get<HTMLButtonElement>(shadow, '[data-action="clear-annotations"]').disabled =
+      state.feedback.annotations.length === 0;
     if (!hidden) placeToolbar();
     renderVisual(true);
   }
@@ -881,9 +1052,11 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   const mutate = (change: ReturnType<typeof Feedback.update>): void => {
     state.copyFallback = null;
     state.feedback = change.model;
+    resetDeletedConversation();
     const persisted = persist();
     render();
-    if (!persisted) showToast('Notes are in memory only. Copy them before closing.');
+    void syncFeedback();
+    if (!persisted) showToast('Feedback is in memory only. Copy it before closing.');
   };
 
   const history = (back: boolean): void => {
@@ -944,10 +1117,11 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     state.composerOpen = false;
     mutate(change);
     get<HTMLButtonElement>(shadow, '[data-action="compose"]').focus();
-    if (!state.storageError) showToast('Note saved locally');
+    if (!state.storageError) showToast('Feedback saved');
   };
 
   const close = (): void => {
+    hideTooltip();
     state.open = false;
     state.hovered = null;
     state.alt = false;
@@ -1086,12 +1260,13 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
           ? formatMarkdown(annotations)
           : JSON.stringify(selectedSnapshot(), null, 2),
       );
-    } else if (action === 'share') void share();
-    else if (action === 'unshare') void unshare();
-    else if (action === 'toggle-model') {
+    } else if (action === 'clear-annotations') {
+      mutate(Feedback.clear(state.feedback));
+      showToast('Feedback cleared. Undo to restore it.');
+    } else if (action === 'toggle-model') {
       state.includeModel = !state.includeModel;
       render();
-      if (!state.includeModel) void unshare();
+      void syncFeedback();
     } else if (action === 'open-source' && button.dataset.source) {
       void fetch(`/__open-in-editor?file=${encodeURIComponent(button.dataset.source)}`)
         .then((response) => {
@@ -1114,21 +1289,35 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       if (annotation === undefined) return;
       if (action === 'delete-annotation')
         mutate(Feedback.remove(state.feedback, annotation.id));
-      else if (action === 'toggle-status')
+      else if (action === 'reply') {
+        const comment = replyDrafts.get(annotation.id) ?? '';
+        if (comment.trim().length === 0) return;
+        replyDrafts.delete(annotation.id);
         mutate(
-          Feedback.changeStatus(
-            state.feedback,
-            annotation.id,
-            annotation.status === 'open' ? 'resolved' : 'open',
-            currentTime(),
-          ),
+          Feedback.reply(state.feedback, annotation.id, {
+            id: Effect.runSync(Effect.sync(() => crypto.randomUUID())),
+            author: 'user',
+            comment,
+            createdAt: currentTime(),
+          }),
         );
-      else if (action === 'focus-note' || action === 'edit-note') {
+      } else if (action === 'focus-note') {
+        state.selected = findTarget(annotation);
+        state.outputOpen = true;
+        state.settingsOpen = false;
+        state.outputFormat = 'notes';
+        render();
+        const item = Array.from(list.children).find(
+          (item) =>
+            item instanceof HTMLElement && item.dataset.annotationId === annotation.id,
+        );
+        item?.scrollIntoView({ block: 'nearest' });
+      } else if (action === 'edit-note') {
         const element = findTarget(annotation);
         if (element === null) {
           state.selected = null;
           state.outputOpen = false;
-          showToast('Editing the saved note; its target is detached.');
+          showToast('Editing saved feedback; its target is detached.');
         } else {
           element.scrollIntoView({ block: 'center', behavior: 'instant' });
           select(element);
@@ -1146,6 +1335,19 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
 
   const onKeyDown = (event: KeyboardEvent): void => {
     const target = event.composedPath()[0];
+    if (event.key === 'Escape') hideTooltip();
+    if (
+      target instanceof HTMLTextAreaElement &&
+      target.dataset.replyId !== undefined &&
+      (event.metaKey || event.ctrlKey) &&
+      event.key === 'Enter'
+    ) {
+      event.preventDefault();
+      target.parentElement
+        ?.querySelector<HTMLButtonElement>('.creasekit-send-reply')
+        ?.click();
+      return;
+    }
     if (
       target === dragHandle &&
       ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
@@ -1291,6 +1493,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     'pointerdown',
     (event) => {
       if (event.button !== 0 || !event.isPrimary) return;
+      hideTooltip();
       const rect = toolbar.getBoundingClientRect();
       drag = {
         pointerId: event.pointerId,
@@ -1315,6 +1518,29 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     capture: true,
     signal: controller.signal,
   });
+  document.addEventListener('visibilitychange', () => void syncFeedback(), {
+    signal: controller.signal,
+  });
+  window.addEventListener(
+    'pagehide',
+    () => {
+      pageInactive = true;
+      pageEpoch += 1;
+      if (syncTimer !== null) window.clearTimeout(syncTimer);
+      pageRemoval =
+        options.agent?.unshare(runtimeId).catch(() => {}) ?? Promise.resolve();
+    },
+    { signal: controller.signal },
+  );
+  window.addEventListener(
+    'pageshow',
+    () => {
+      if (!pageInactive) return;
+      pageInactive = false;
+      void pageRemoval.then(() => syncFeedback());
+    },
+    { signal: controller.signal },
+  );
   window.addEventListener('scroll', () => scheduleVisual(true), {
     capture: true,
     passive: true,
@@ -1323,6 +1549,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   window.addEventListener(
     'resize',
     () => {
+      hideTooltip();
       if (!hidden) placeToolbar();
       scheduleVisual(true);
     },
@@ -1345,6 +1572,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     'blur',
     () => {
       stopDrag();
+      hideTooltip();
       state.alt = false;
       state.hovered = null;
       scheduleVisual();
@@ -1352,6 +1580,10 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     { signal: controller.signal },
   );
   shadow.addEventListener('click', onOverlayClick, { signal: controller.signal });
+  for (const type of ['pointerover', 'focusin'])
+    shadow.addEventListener(type, showTooltip, { signal: controller.signal });
+  for (const type of ['pointerout', 'focusout', 'pointerdown'])
+    shadow.addEventListener(type, hideTooltip, { signal: controller.signal });
   shadow.addEventListener('toggle', placeCard, {
     capture: true,
     signal: controller.signal,
@@ -1363,6 +1595,16 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
         state.draft = textarea.value;
         get<HTMLButtonElement>(shadow, '[data-action="add"]').disabled =
           state.draft.trim().length === 0;
+      } else if (
+        event.target instanceof HTMLTextAreaElement &&
+        event.target.dataset.replyId !== undefined
+      ) {
+        replyDrafts.set(event.target.dataset.replyId, event.target.value);
+        const send = event.target.parentElement?.querySelector<HTMLButtonElement>(
+          '.creasekit-send-reply',
+        );
+        if (send !== null && send !== undefined)
+          send.disabled = event.target.value.trim().length === 0;
       }
     },
     { signal: controller.signal },
@@ -1376,7 +1618,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       if (input.dataset.setting === 'rulers') state.rulers = input.checked;
       if (input.dataset.setting === 'model') {
         state.includeModel = input.checked;
-        if (!state.includeModel) void unshare();
+        void syncFeedback();
       }
       render();
     },
@@ -1384,6 +1626,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
   );
   let unsubscribeContext = options.foldkit?.subscribe(() => scheduleVisual(true));
   render();
+  void syncFeedback();
 
   const handle: CreasekitHandle = {
     open,
@@ -1392,10 +1635,12 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      hideTooltip();
       mounts.delete(target);
       controller.abort();
       unsubscribeContext?.();
-      if (state.shared) void options.agent?.unshare(runtimeId).catch(() => {});
+      if (syncTimer !== null) window.clearTimeout(syncTimer);
+      void options.agent?.unshare(runtimeId).catch(() => {});
       mutationObserver.disconnect();
       resizeObserver?.disconnect();
       if (frame !== null) window.cancelAnimationFrame(frame);
@@ -1413,6 +1658,7 @@ export const mountCreasekit = (options: CreasekitOptions = {}): CreasekitHandle 
       }
       options = { ...options, ...next };
       render();
+      void syncFeedback();
     },
   });
   return handle;

@@ -88,7 +88,7 @@ describe('homepage view', () => {
       ).toBeAbsent(),
       Scene.expect(
         Scene.text(
-          'The --cwd directory contains .creasekit/mcp-session.json. Choose Share snapshot only after reviewing the read-only snapshot, and choose Stop sharing to revoke the current one.',
+          'The --cwd directory contains .creasekit/mcp-session.json. Feedback syncs automatically while the page is loaded. Ask your agent to read it, reply in the conversations, and clear annotations after addressing them.',
         ),
       ).toExist(),
       Scene.expect(Scene.role('status')).toBeAbsent(),

@@ -9,17 +9,24 @@ import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite';
 import { transformAutomaticContext } from './automatic-transform.js';
 
 import {
+  BRIDGE_COMMANDS_PATH,
   BRIDGE_CONTEXT_PATH,
   BRIDGE_SHARE_PATH,
+  BRIDGE_SYNC_PATH,
   BRIDGE_UNSHARE_PATH,
+  BRIDGE_WATCH_PATH,
+  BridgeCommandRequest,
+  CommandQueueError,
   MAX_REQUEST_BODY_BYTES,
   type OwnedSessionFile,
   type SessionDescriptor,
   SnapshotStore,
   UnshareRequest,
+  WatchRequest,
   constantTimeTokenEqual,
   createSessionDescriptor,
   decodeSnapshot,
+  decodeSyncRequest,
   isLoopbackAddress,
   isLoopbackHostname,
   removeOwnedSessionFile,
@@ -31,6 +38,8 @@ export interface CreasekitPluginOptions {
   readonly autoMount?: boolean;
   readonly excludeModelKeys?: ReadonlyArray<string>;
 }
+
+const SESSION_DIRECTORY_DENY_GLOB = '**/.creasekit/**';
 
 class RequestBodyTooLargeError extends Error {}
 class InvalidRequestBodyError extends Error {}
@@ -59,6 +68,9 @@ export const creasekit = (options: CreasekitPluginOptions = {}): Plugin => {
     config: () => ({ optimizeDeps: { exclude: ['creasekit'] } }),
     configResolved(config) {
       assertSecureDevelopmentConfig(config);
+      if (!config.server.fs.deny.includes(SESSION_DIRECTORY_DENY_GLOB)) {
+        config.server.fs.deny.push(SESSION_DIRECTORY_DENY_GLOB);
+      }
       projectRoot = realpathSync(config.root);
     },
     resolveId(id) {
@@ -212,11 +224,18 @@ const handleBridgeRequest = async (
 ): Promise<boolean> => {
   const requestUrl = parseRequestUrl(request.url);
   if (requestUrl === undefined) return false;
+  if (isProtectedSessionPath(requestUrl.pathname)) {
+    sendJson(response, 404, { error: 'not_found' });
+    return true;
+  }
 
   const bridgePath =
     requestUrl.pathname === BRIDGE_SHARE_PATH ||
     requestUrl.pathname === BRIDGE_UNSHARE_PATH ||
-    requestUrl.pathname === BRIDGE_CONTEXT_PATH;
+    requestUrl.pathname === BRIDGE_CONTEXT_PATH ||
+    requestUrl.pathname === BRIDGE_SYNC_PATH ||
+    requestUrl.pathname === BRIDGE_COMMANDS_PATH ||
+    requestUrl.pathname === BRIDGE_WATCH_PATH;
   if (!bridgePath) return false;
 
   const host = validateHost(request);
@@ -269,7 +288,12 @@ const handleBridgeRequest = async (
     sendMethodNotAllowed(response, 'POST');
     return true;
   }
-  if (!hasSameOrigin(request, host)) {
+  const isCommandRequest = requestUrl.pathname === BRIDGE_COMMANDS_PATH;
+  if (isCommandRequest && !isAuthorized(request, descriptor.token)) {
+    sendJson(response, 401, { error: 'unauthorized' });
+    return true;
+  }
+  if (!isCommandRequest && !hasSameOrigin(request, host)) {
     sendJson(response, 403, { error: 'invalid_origin' });
     return true;
   }
@@ -290,6 +314,90 @@ const handleBridgeRequest = async (
       sendJson(response, 413, { error: 'request_body_too_large' });
     } else {
       sendJson(response, 400, { error: 'malformed_json' });
+    }
+    return true;
+  }
+
+  if (requestUrl.pathname === BRIDGE_COMMANDS_PATH) {
+    let queued;
+    try {
+      const command = Schema.decodeUnknownSync(BridgeCommandRequest)(input);
+      queued = store.queueCommand(command);
+    } catch (error) {
+      if (error instanceof CommandQueueError) {
+        sendCommandQueueError(response, error);
+      } else {
+        sendJson(response, 422, { error: 'invalid_command_request' });
+      }
+      return true;
+    }
+
+    const cancelIfDisconnected = (): void => {
+      if (!response.writableEnded) queued.cancel();
+    };
+    response.once('close', cancelIfDisconnected);
+    try {
+      const result = await queued.completion;
+      if (!response.destroyed) sendJson(response, 200, result);
+    } catch (error) {
+      if (!response.destroyed) {
+        if (error instanceof CommandQueueError) {
+          sendCommandQueueError(response, error);
+        } else {
+          sendJson(response, 500, { error: 'internal_bridge_error' });
+        }
+      }
+    } finally {
+      response.off('close', cancelIfDisconnected);
+    }
+    return true;
+  }
+
+  if (requestUrl.pathname === BRIDGE_WATCH_PATH) {
+    let watch;
+    try {
+      const { runtimeId } = Schema.decodeUnknownSync(WatchRequest)(input);
+      watch = store.watch(runtimeId);
+    } catch (error) {
+      if (error instanceof CommandQueueError) {
+        sendCommandQueueError(response, error);
+      } else {
+        sendJson(response, 422, { error: 'invalid_watch_request' });
+      }
+      return true;
+    }
+
+    const cancelIfDisconnected = (): void => {
+      if (!response.writableEnded) watch.cancel();
+    };
+    response.once('close', cancelIfDisconnected);
+    try {
+      await watch.completion;
+      if (!response.destroyed) sendEmpty(response, 204);
+    } catch (error) {
+      if (!response.destroyed) {
+        if (error instanceof CommandQueueError) {
+          sendCommandQueueError(response, error);
+        } else {
+          sendJson(response, 500, { error: 'internal_bridge_error' });
+        }
+      }
+    } finally {
+      response.off('close', cancelIfDisconnected);
+    }
+    return true;
+  }
+
+  if (requestUrl.pathname === BRIDGE_SYNC_PATH) {
+    try {
+      const result = store.sync(decodeSyncRequest(input));
+      if (result === undefined) {
+        sendJson(response, 429, { error: 'session_limit_reached' });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 422, { error: 'invalid_sync_request' });
     }
     return true;
   }
@@ -323,6 +431,43 @@ const handleBridgeRequest = async (
   return true;
 };
 
+const sendCommandQueueError = (
+  response: ServerResponse,
+  error: CommandQueueError,
+): void => {
+  switch (error.reason) {
+    case 'NotShared':
+      sendJson(response, 404, { error: 'snapshot_not_shared' });
+      return;
+    case 'SnapshotStale':
+      sendJson(response, 410, { error: 'snapshot_stale' });
+      return;
+    case 'AnnotationNotFound':
+      sendJson(response, 404, { error: 'annotation_not_found' });
+      return;
+    case 'QueueFull':
+      sendJson(response, 429, { error: 'command_queue_full' });
+      return;
+    case 'WatchLimit':
+      sendJson(response, 429, { error: 'command_watch_limit' });
+      return;
+    case 'InvalidCommand':
+      sendJson(response, 422, { error: 'invalid_command' });
+      return;
+    case 'NotApplied':
+      sendJson(response, 409, { error: 'command_not_applied' });
+      return;
+    case 'Expired':
+      sendJson(response, 504, { error: 'command_timeout' });
+      return;
+    case 'Cancelled':
+      sendJson(response, 503, { error: 'command_cancelled' });
+      return;
+    case 'DuplicateCommandId':
+      sendJson(response, 503, { error: 'command_id_collision' });
+  }
+};
+
 const parseRequestUrl = (value: string | undefined): URL | undefined => {
   if (value === undefined) return undefined;
   try {
@@ -330,6 +475,31 @@ const parseRequestUrl = (value: string | undefined): URL | undefined => {
   } catch {
     return undefined;
   }
+};
+
+const isProtectedSessionPath = (pathname: string): boolean => {
+  let decoded = pathname;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (
+      decoded
+        .replaceAll('\\', '/')
+        .split('/')
+        .some((segment) => segment.toLowerCase() === '.creasekit')
+    ) {
+      return true;
+    }
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return false;
+      decoded = next;
+    } catch {
+      return false;
+    }
+  }
+  return decoded
+    .replaceAll('\\', '/')
+    .split('/')
+    .some((segment) => segment.toLowerCase() === '.creasekit');
 };
 
 const validateHost = (request: IncomingMessage): ValidHost | undefined => {
