@@ -35,7 +35,7 @@ describe('MCP annotation mutation tools', () => {
     if (root !== undefined) await rm(root, { recursive: true, force: true });
   });
 
-  it('replies, deletes, and scoped-clears through acknowledged live browser state', async () => {
+  it('deletes and scoped-clears through acknowledged live browser state', async () => {
     root = await mkdtemp(join(tmpdir(), 'creasekit-mcp-mutations-'));
     bridge = await startTestBridge(root);
     client = new McpClient(root);
@@ -45,36 +45,6 @@ describe('MCP annotation mutation tools', () => {
     await browserSync(bridge, snapshot);
     const annotation = snapshot.annotations[0];
     if (annotation === undefined) throw new Error('Fixture annotation is missing');
-
-    const replyCall = client.callTool('creasekit_reply_to_annotation', {
-      runtimeId: snapshot.runtimeId,
-      annotationId: annotation.id,
-      comment: '  The agent implemented this change.  ',
-    });
-    const reply = await waitForCommand(bridge, snapshot, 'reply');
-    if (reply.type !== 'reply') throw new Error('Expected a reply command');
-    expect(reply.comment).toBe('The agent implemented this change.');
-    snapshot = {
-      ...snapshot,
-      annotations: [
-        {
-          ...annotation,
-          replies: [
-            {
-              id: reply.id,
-              author: 'agent',
-              comment: reply.comment,
-              createdAt: reply.createdAt,
-            },
-          ],
-        },
-      ],
-    };
-    await browserSync(bridge, snapshot, [reply.id]);
-    expect(successContent(await replyCall)).toEqual({
-      command: reply,
-      snapshot,
-    });
 
     const deleteCall = client.callTool('creasekit_delete_annotation', {
       runtimeId: snapshot.runtimeId,
@@ -88,21 +58,12 @@ describe('MCP annotation mutation tools', () => {
       snapshot,
     });
 
-    const missingReply = await client.callTool('creasekit_reply_to_annotation', {
+    const missingDelete = await client.callTool('creasekit_delete_annotation', {
       runtimeId: snapshot.runtimeId,
       annotationId: annotation.id,
-      comment: 'This thread no longer exists.',
     });
-    expect(missingReply.isError).toBe(true);
-    expect(toolText(missingReply)).toContain('not_shared');
-
-    const emptyReply = await client.callTool('creasekit_reply_to_annotation', {
-      runtimeId: snapshot.runtimeId,
-      annotationId: annotation.id,
-      comment: '   ',
-    });
-    expect(emptyReply.isError).toBe(true);
-    expect(toolText(emptyReply)).toContain('invalid_command');
+    expect(missingDelete.isError).toBe(true);
+    expect(toolText(missingDelete)).toContain('not_shared');
 
     const first = annotationFixture('clear-first');
     const second = annotationFixture('clear-second');

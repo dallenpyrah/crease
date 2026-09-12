@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentCommand, AgentSnapshot, AgentSyncRequest } from './agent-contract';
 import { type CreasekitHandle, mountCreasekit } from './creasekit';
 
-describe('automatically synced annotation conversations', () => {
+describe('automatically synced annotations', () => {
   let handle: CreasekitHandle;
   let root: ShadowRoot;
   let target: HTMLButtonElement;
@@ -81,66 +81,42 @@ describe('automatically synced annotation conversations', () => {
     expect(snapshot.annotations[0]?.comment).toBe('Increase padding');
   });
 
-  it('applies agent replies once, preserves an in-progress user draft and persists the conversation', async () => {
+  it('shows annotations without reply controls and preserves legacy saved data', async () => {
     add('Increase padding');
     await vi.advanceTimersByTimeAsync(1);
-    const id = snapshot.annotations[0]!.id;
-    click('open-output');
-    const input = element<HTMLTextAreaElement>('.creasekit-reply');
-    input.value = 'Also on mobile';
-    input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    input.focus();
-    input.setSelectionRange(4, 4);
-    pending = [
+    const legacy = [
       {
-        id: 'reply-1',
-        type: 'reply',
-        annotationId: id,
-        comment: '<b>Done</b>',
-        createdAt: Date.now(),
+        ...snapshot.annotations[0],
+        replies: [
+          {
+            id: 'legacy-reply',
+            author: 'agent',
+            comment: 'Previously saved reply',
+            createdAt: Date.now(),
+          },
+        ],
       },
     ];
-    await vi.advanceTimersByTimeAsync(1005);
-    expect(snapshot.annotations[0]?.replies).toHaveLength(1);
-    expect(element('.creasekit-message p').textContent).toBe('<b>Done</b>');
-    expect(root.querySelector('.creasekit-message b')).toBeNull();
-    expect(element<HTMLTextAreaElement>('.creasekit-reply').value).toBe(
-      'Also on mobile',
+    window.localStorage.setItem(
+      'creasekit:conversations:annotations',
+      JSON.stringify(legacy),
     );
-    expect(shadowReplySelection()).toBe(4);
-    pending = [
-      {
-        id: 'reply-1',
-        type: 'reply',
-        annotationId: id,
-        comment: '<b>Done</b>',
-        createdAt: Date.now(),
-      },
-    ];
-    await vi.advanceTimersByTimeAsync(1005);
-    expect(snapshot.annotations[0]?.replies).toHaveLength(1);
-    click('reply');
-    await vi.advanceTimersByTimeAsync(1);
-    expect(snapshot.annotations[0]?.replies?.map((reply) => reply.author)).toEqual([
-      'agent',
-      'user',
-    ]);
-    const stored = JSON.parse(
-      window.localStorage.getItem('creasekit:conversations:annotations')!,
-    );
-    expect(stored[0].replies[1].comment).toBe('Also on mobile');
-    expect(pending).toHaveLength(0);
     handle.destroy();
     handle = mountCreasekit({ projectId: 'conversations', startOpen: true });
     root = document.querySelector('[data-creasekit-root]')!.shadowRoot!;
     handle.showOutput();
-    expect(root.querySelectorAll('.creasekit-message')).toHaveLength(2);
+    expect(element('.creasekit-list-item-comment').textContent).toBe(
+      'Increase padding',
+    );
+    expect(root.querySelector('.creasekit-reply')).toBeNull();
+    expect(root.querySelector('[data-action="reply"]')).toBeNull();
+    expect(root.querySelector('.creasekit-message')).toBeNull();
+    expect(element('[data-output-format="notes"]').textContent).toBe('Annotations');
+    expect(
+      JSON.parse(window.localStorage.getItem('creasekit:conversations:annotations')!)[0]
+        .replies[0].comment,
+    ).toBe('Previously saved reply');
   });
-
-  const shadowReplySelection = () => {
-    const active = root.activeElement;
-    return active instanceof HTMLTextAreaElement ? active.selectionStart : null;
-  };
 
   it('keeps annotations added after the agent requested a clear, including while hidden', async () => {
     add('First');

@@ -81,16 +81,8 @@ button svg { width: 17px; height: 17px; flex-shrink: 0; }
 .creasekit-list-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #9297a0; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .creasekit-list-target { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: none; color: #5a6575; text-align: left; font: inherit; }
 .creasekit-list-item-comment { margin: 9px 0; color: #434a54; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.creasekit-conversation-author { margin-top: 10px; color: #626d7e; font-size: 10px; }
 .creasekit-list-item-actions { display: flex; gap: 5px; }
 .creasekit-list-item-actions .creasekit-action { min-height: 24px; padding: 3px 6px; font-size: 10px; }
-.creasekit-conversation { display: grid; gap: 8px; margin-top: 10px; }
-.creasekit-message { padding: 8px 10px; border-radius: 7px; background: #f5f6f8; }
-.creasekit-message.is-agent { background: #eef7fd; }
-.creasekit-message strong { color: #626d7e; font-size: 10px; font-weight: 500; }
-.creasekit-message p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
-.creasekit-reply { display: block; width: 100%; min-height: 52px; max-height: 150px; resize: vertical; margin-top: 10px; padding: 8px; border: 1px solid #e1e5ea; border-radius: 6px; background: #fff; color: #434a54; }
-.creasekit-send-reply { margin-top: 6px; }
 .creasekit-empty { padding: 25px 18px 30px; text-align: center; color: #959ba5; }
 .creasekit-empty svg { display: block; width: 28px; height: 28px; margin: 0 auto 12px; color: #bbc2cd; }
 .creasekit-empty strong { display: block; color: #454d59; font-size: 12px; font-weight: 500; }

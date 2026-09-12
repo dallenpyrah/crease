@@ -22,9 +22,6 @@ const formatAnnotation = (annotation: Annotation, index: number): string => {
     `## Annotation ${index + 1} · ${annotation.id}`,
     '',
     `**Feedback:** ${annotation.comment}`,
-    ...(annotation.replies ?? []).map(
-      (reply) => `**${reply.author === 'agent' ? 'Agent' : 'You'}:** ${reply.comment}`,
-    ),
     `**Element:** ${annotation.target.tag}${annotation.target.role ? ` (${annotation.target.role})` : ''}`,
     `**Selector:** \`${annotation.target.selector}\``,
     `**Text:** ${annotation.target.text || '—'}`,

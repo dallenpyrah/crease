@@ -84,19 +84,16 @@ describe('authenticated browser command bridge', () => {
     expect((await responsePromise).status).toBe(200);
   });
 
-  it('fails a reply acknowledged after its target was concurrently deleted', async () => {
-    const snapshot = snapshotFixture('reply-race');
+  it('fails a clear acknowledged before its captured scope is applied', async () => {
+    const snapshot = snapshotFixture('clear-race');
     await browserSync(bridge, snapshot);
     const responsePromise = postCommand(bridge, {
       runtimeId: snapshot.runtimeId,
-      type: 'reply',
-      annotationId: snapshot.annotations[0]?.id,
-      comment: 'Agent reply',
+      type: 'clear',
     });
     const [command] = await waitForCommands(bridge, snapshot);
 
-    const deletedSnapshot = { ...snapshot, annotations: [] };
-    expect(await browserSync(bridge, deletedSnapshot, [command?.id ?? ''])).toEqual({
+    expect(await browserSync(bridge, snapshot, [command?.id ?? ''])).toEqual({
       commands: [],
     });
     const response = await responsePromise;
@@ -187,12 +184,14 @@ describe('authenticated browser command bridge', () => {
   it('preserves request limits and removes commands when their requester disconnects', async () => {
     const snapshot = snapshotFixture('cancel-command');
     await browserSync(bridge, snapshot);
-    const malformed = await fetch(new URL(BRIDGE_COMMANDS_PATH, bridge.session.url), {
-      method: 'POST',
-      headers: commandHeaders(bridge),
-      body: JSON.stringify({ runtimeId: snapshot.runtimeId, type: 'resolve' }),
-    });
-    expect(malformed.status).toBe(422);
+    for (const type of ['reply', 'resolve']) {
+      const malformed = await fetch(new URL(BRIDGE_COMMANDS_PATH, bridge.session.url), {
+        method: 'POST',
+        headers: commandHeaders(bridge),
+        body: JSON.stringify({ runtimeId: snapshot.runtimeId, type }),
+      });
+      expect(malformed.status).toBe(422);
+    }
 
     const oversized = await fetch(new URL(BRIDGE_COMMANDS_PATH, bridge.session.url), {
       method: 'POST',

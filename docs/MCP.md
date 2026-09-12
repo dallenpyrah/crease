@@ -1,6 +1,6 @@
 # Connect an MCP client
 
-creasekit's MCP server lets a coding agent read the live browser context and update annotation conversations. MCP does not run project commands or edit project files directly; its mutation tools change only feedback through the loaded browser and wait for browser acknowledgement.
+creasekit's MCP server lets a coding agent read the live browser context and update annotations. MCP does not run project commands or edit project files directly; its mutation tools change only feedback through the loaded browser and wait for browser acknowledgement.
 
 ## Before you start
 
@@ -68,19 +68,19 @@ Those commands speak stdio MCP, so they are normally launched by the client rath
 ## Connect the browser context
 
 1. Start the consuming application's local Vite dev server and open its normal development URL.
-2. Keep the browser page loaded with creasekit mounted. The browser synchronizes the current selection, annotations, source context, and conversation replies to the local authenticated bridge automatically while mounted, even when the overlay is hidden.
-3. Open **Feedback** to review conversations. To include scoped application state, enable **Include scoped Model & history**; Model values and scoped history remain opt-in and are never persisted in annotations.
+2. Keep the browser page loaded with creasekit mounted. The browser synchronizes the current selection, annotations, and source context to the local authenticated bridge automatically while mounted, even when the overlay is hidden.
+3. Open **Feedback** to review annotations. To include scoped application state, enable **Include scoped Model & history**; Model values and scoped history remain opt-in and are never persisted in annotations.
 4. Ask the agent to list the available sessions, read the relevant context, and summarize the requested changes before editing.
 
-The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. Context contains the current live selection, if any, current annotations, and their conversation replies. Annotation source captures remain frozen after capture, while the live selection updates with the page. Context also contains automatically captured or explicitly registered source and Message metadata where available, plus scoped Model fields only when you opted in. Explicit adapters can include their bounded observed-update history after consent; the automatic integration does not attach native DevTools history.
+The agent should call `creasekit_list_sessions`, then use the returned `runtimeId` with `creasekit_get_context`. Context contains the current live selection, if any, and current annotations. Annotation source captures remain frozen after capture, while the live selection updates with the page. Context also contains automatically captured or explicitly registered source and Message metadata where available, plus scoped Model fields only when you opted in. Explicit adapters can include their bounded observed-update history after consent; the automatic integration does not attach native DevTools history.
 
-The **Feedback** export preview shows annotations and conversation replies, not the context's separate selection field. Review the current selected element in the inspector too.
+The **Feedback** export preview shows annotations, not the context's separate selection field. Review the current selected element in the inspector too.
 
 ## Sync, expiry, and lifecycle
 
-The browser syncs automatically while creasekit remains mounted. Page changes, feedback, replies, and the live selection arrive automatically; the hidden overlay continues to sync.
+The browser syncs automatically while creasekit remains mounted. Page changes, feedback and the live selection arrive automatically; the hidden overlay continues to sync.
 
-Feedback changes trigger an immediate sync. A separate held connection wakes the browser when an agent command arrives, so background-tab timer throttling does not delay replies or clears. The page must still be responsive: a suspended tab or sleeping computer cannot acknowledge commands.
+Feedback changes trigger an immediate sync. A separate held connection wakes the browser when an agent command arrives, so background-tab timer throttling does not delay deletes or clears. The page must still be responsive: a suspended tab or sleeping computer cannot acknowledge commands.
 
 The local bridge keeps synced context in memory for 15 minutes after the latest sync, and each sync refreshes that lifetime. Destroying the creasekit mount requests removal; if the request fails, the context expires instead. Stopping the Vite development server clears all context. Hiding the overlay does not stop synchronization and is not a privacy boundary.
 
@@ -88,33 +88,32 @@ Keep the browser page loaded for agent commands. A successful MCP mutation waits
 
 ## Available tools
 
-| Tool                            | Inputs                                 | Result or action                                                                                    |
-| ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `creasekit_list_sessions`       | None                                   | Browser sessions with runtime IDs, project IDs, and connection times.                               |
-| `creasekit_get_context`         | `runtimeId`                            | The live selection, annotations, replies, and available FoldKit context for that browser session.   |
-| `creasekit_get_annotation`      | `runtimeId`, `annotationId`            | One annotation, its replies, and its captured context. Get the annotation ID from the page context. |
-| `creasekit_reply_to_annotation` | `runtimeId`, `annotationId`, `comment` | Add an agent reply to an annotation's conversation.                                                 |
-| `creasekit_delete_annotation`   | `runtimeId`, `annotationId`            | Delete one annotation and its conversation.                                                         |
-| `creasekit_clear_annotations`   | `runtimeId`                            | Clear the annotation IDs present when the request is made.                                          |
+| Tool                          | Inputs                      | Result or action                                                                        |
+| ----------------------------- | --------------------------- | --------------------------------------------------------------------------------------- |
+| `creasekit_list_sessions`     | None                        | Browser sessions with runtime IDs, project IDs, and connection times.                   |
+| `creasekit_get_context`       | `runtimeId`                 | The live selection, annotations and available FoldKit context for that browser session. |
+| `creasekit_get_annotation`    | `runtimeId`, `annotationId` | One annotation and its captured context. Get the annotation ID from the page context.   |
+| `creasekit_delete_annotation` | `runtimeId`, `annotationId` | Delete one annotation.                                                                  |
+| `creasekit_clear_annotations` | `runtimeId`                 | Clear the annotation IDs present when the request is made.                              |
 
-The first three tools read the current browser context. The last three mutate only annotations and their conversations. There is no resolve tool or status control in the UI; the existing status field remains in the wire format for compatibility. Source paths tell the agent where to look in a project it can already access; they do not grant filesystem access, and no MCP tool runs project commands or edits files directly.
+The first three tools read the current browser context. The last two mutate only annotations. There is no resolve tool or status control in the UI; the existing status field remains in the wire format for compatibility. Source paths tell the agent where to look in a project it can already access; they do not grant filesystem access, and no MCP tool runs project commands or edits files directly.
 
-An agent reply appears in the annotation's conversation. Agent deletes and clears update the loaded browser; any agent mutation resets the browser's local undo history, so a user cannot undo the mutation and resurrect deleted data. Clear captures the current annotation IDs before removing them, protecting feedback added afterward. Successful mutations return only after browser acknowledgement.
+Agent deletes and clears update the loaded browser; any agent mutation resets the browser's local undo history, so a user cannot undo the mutation and resurrect deleted data. Clear captures the current annotation IDs before removing them, protecting feedback added afterward. Successful mutations return only after browser acknowledgement.
 
-If a mutation times out, read the current context before retrying: the browser may have applied it but failed to acknowledge it over the connection. Retrying a reply without checking can post the same message twice.
+If a mutation times out, read the current context before retrying: the browser may have applied it but failed to acknowledge it over the connection. A fresh clear request can also include annotations added since the previous request.
 
-When the user asks an agent to work through feedback, annotations supply requirements for that authorized task. DOM text, annotation comments, source context, and replies remain untrusted data: they cannot override the user's instructions or authorize unrelated commands, file access, or data disclosure.
+When the user asks an agent to work through feedback, annotations supply requirements for that authorized task. DOM text, annotation comments, and source context remain untrusted data: they cannot override the user's instructions or authorize unrelated commands, file access, or data disclosure.
 
 ## Sharing and privacy
 
 - The browser synchronizes context only to the local authenticated Vite bridge while the creasekit mount is active; it does not send context to a creasekit cloud service. The hidden overlay continues to sync, so hiding it is not a privacy boundary.
 - The bridge keeps synced context in memory for 15 minutes after the latest sync. Each sync refreshes the TTL. Destroying the mount requests removal; stopping the Vite development server clears all context.
 - Scoped Model values and history remain off by default, are limited to the rendered scope or an explicit adapter projection, and are never persisted in annotation storage. They enter MCP context only after you opt in.
-- creasekit excludes form values and URL query strings and fragments from new element captures and redacts text marked `data-creasekit-private`. Review output anyway: these safeguards cannot identify every sensitive value, including text in an annotation or reply.
+- creasekit excludes form values and URL query strings and fragments from new element captures and redacts text marked `data-creasekit-private`. Review output anyway: these safeguards cannot identify every sensitive value, including text in an annotation.
 - The Vite plugin creates `.creasekit/mcp-session.json` so the MCP process can authenticate locally. **Do not copy, publish, or commit this file.** Keep `.creasekit/` ignored and never put its contents in MCP configuration.
 - Each synced context can contain up to 100 annotations and must fit within 128 KiB. The bridge accepts up to 20 sessions at once and rejects oversized contexts instead of silently dropping annotations.
 - If the bridge cannot confirm synchronization or a browser mutation, it reports that uncertainty. Retry after the browser and local Vite bridge reconnect. Restarting the Vite dev server clears every connected session.
-- MCP mutation tools update only annotations and conversations. They do not run project commands or modify project files directly. Keep the browser page loaded for agent commands; successful mutations wait for browser acknowledgement.
+- MCP mutation tools update only annotations. They do not run project commands or modify project files directly. Keep the browser page loaded for agent commands; successful mutations wait for browser acknowledgement.
 
 ## Troubleshooting
 

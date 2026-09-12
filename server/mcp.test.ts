@@ -55,7 +55,6 @@ describe('Effect v4 MCP stdio server', () => {
       'creasekit_list_sessions',
       'creasekit_get_context',
       'creasekit_get_annotation',
-      'creasekit_reply_to_annotation',
       'creasekit_delete_annotation',
       'creasekit_clear_annotations',
     ]);

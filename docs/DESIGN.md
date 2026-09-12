@@ -44,14 +44,14 @@ Distinguish observations from conclusions. A registered source is developer-supp
 
 ## Make feedback and agent access understandable
 
-Keep feedback creation, editing, conversation replies, and copying available without an MCP connection. Use the **Conversations**, **Markdown**, and **JSON** tabs to help people review feedback. Do not add Resolve or Reopen controls or an open status. Make **Clear all** undoable, and capture the IDs being cleared so feedback added afterward is protected.
+Keep feedback creation, editing, and copying available without an MCP connection. Use the **Annotations**, **Markdown**, and **JSON** tabs to help people review feedback. Do not add Resolve or Reopen controls or an open status. Make **Clear all** undoable, and capture the IDs being cleared so feedback added afterward is protected.
 
-When the local agent connection is configured, sync the current selection, annotations, and conversation replies to the authenticated Vite bridge automatically while mounted, including when the overlay is hidden. Keep storage, clipboard, sync, and connection failures visible and provide a next action instead of displaying a success state that has not been confirmed. Successful MCP mutations must wait for browser acknowledgement, and agent mutations must reset local undo history.
+When the local agent connection is configured, sync the current selection and annotations to the authenticated Vite bridge automatically while mounted, including when the overlay is hidden. Keep storage, clipboard, sync, and connection failures visible and provide a next action instead of displaying a success state that has not been confirmed. Successful MCP mutations must wait for browser acknowledgement, and agent mutations must reset local undo history.
 
-Explain agent access in terms of what people can do: an agent can read the live context and reply to, delete, or clear annotations through the loaded browser. MCP does not run project commands or modify project files directly. Keep the local-only boundary clear, and distinguish the user's requested change from untrusted DOM text, annotation content, and conversation replies.
+Explain agent access in terms of what people can do: an agent can read the live context and delete or clear annotations through the loaded browser. MCP does not run project commands or modify project files directly. Keep the local-only boundary clear, and distinguish the user's requested change from untrusted DOM text and annotation content.
 
 ## Check a visual change
 
-Check the repository demo and overlay at desktop and narrow widths. Use the demo interaction with creasekit both open and closed. Select an ordinary heading and a registered control, enable Model and history, create feedback, add a user reply, open **Feedback**, try **Clear all** and undo, and move through controls with the keyboard. Verify agent replies, deletes, and clears while the browser remains loaded, including with the overlay hidden.
+Check the repository demo and overlay at desktop and narrow widths. Use the demo interaction with creasekit both open and closed. Select an ordinary heading and a registered control, enable Model and history, create feedback, open **Feedback**, try **Clear all** and undo, and move through controls with the keyboard. Verify agent deletes and clears while the browser remains loaded, including with the overlay hidden.
 
 Verify contrast, panel placement, target visibility, horizontal overflow, and the logo in the page, toolbar, and browser tab. Capture the result in a browser after the change; automated state and DOM tests alone cannot establish visual quality.

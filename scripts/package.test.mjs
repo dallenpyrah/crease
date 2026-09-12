@@ -278,7 +278,6 @@ test(
               'creasekit_get_annotation',
               'creasekit_get_context',
               'creasekit_list_sessions',
-              'creasekit_reply_to_annotation',
             ]);
             const listed = await client.request('tools/call', {
               name: 'creasekit_list_sessions',

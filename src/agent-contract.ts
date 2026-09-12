@@ -21,14 +21,6 @@ export const AgentSnapshot = Schema.Struct({
 });
 export type AgentSnapshot = typeof AgentSnapshot.Type;
 
-const AgentReplyCommand = Schema.Struct({
-  id: Schema.String,
-  type: Schema.Literal('reply'),
-  annotationId: Schema.String,
-  comment: Schema.String,
-  createdAt: Schema.Number,
-});
-
 const AgentDeleteCommand = Schema.Struct({
   id: Schema.String,
   type: Schema.Literal('delete'),
@@ -43,11 +35,7 @@ const AgentClearCommand = Schema.Struct({
   createdAt: Schema.Number,
 });
 
-export const AgentCommand = Schema.Union([
-  AgentReplyCommand,
-  AgentDeleteCommand,
-  AgentClearCommand,
-]);
+export const AgentCommand = Schema.Union([AgentDeleteCommand, AgentClearCommand]);
 export type AgentCommand = typeof AgentCommand.Type;
 
 export const AgentSyncRequest = Schema.Struct({

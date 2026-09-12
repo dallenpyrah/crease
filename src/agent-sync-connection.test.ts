@@ -56,7 +56,7 @@ describe('browser automatic agent sync connection', () => {
     });
   });
 
-  it('rejects malformed, mistyped, and duplicate command responses', async () => {
+  it('rejects malformed, unsupported, and duplicate command responses', async () => {
     const responses = [
       new Response('{', {
         status: 200,
@@ -64,6 +64,20 @@ describe('browser automatic agent sync connection', () => {
       }),
       Response.json(
         { commands: [{ id: 'bad', type: 'resolve', createdAt: 1 }] },
+        { headers: { 'content-type': 'application/json' } },
+      ),
+      Response.json(
+        {
+          commands: [
+            {
+              id: 'legacy-reply',
+              type: 'reply',
+              annotationId: 'annotation-1',
+              comment: 'No longer supported',
+              createdAt: 1,
+            },
+          ],
+        },
         { headers: { 'content-type': 'application/json' } },
       ),
       Response.json(

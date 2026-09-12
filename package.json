@@ -1,6 +1,6 @@
 {
   "name": "creasekit",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Visual feedback for FoldKit: inspect elements, leave notes, and share context with coding agents through MCP.",
   "keywords": [
     "annotations",

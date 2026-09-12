@@ -35,7 +35,6 @@ export const MAX_ANNOTATIONS = 100;
 export const MAX_SESSIONS = 20;
 export const MAX_PENDING_COMMANDS = 100;
 export const MAX_ACKNOWLEDGED_COMMAND_IDS = 200;
-export const MAX_AGENT_REPLY_LENGTH = 4_000;
 export const MAX_COMMAND_WATCHERS = 1;
 export const COMMAND_WATCH_HEARTBEAT_MS = 15_000;
 export const SNAPSHOT_TTL_MS = 15 * 60 * 1000;
@@ -51,13 +50,6 @@ export type UnshareRequest = typeof UnshareRequest.Type;
 export const WatchRequest = Schema.Struct({ runtimeId: Schema.String });
 export type WatchRequest = typeof WatchRequest.Type;
 
-const ReplyCommandRequest = Schema.Struct({
-  runtimeId: Schema.String,
-  type: Schema.Literal('reply'),
-  annotationId: Schema.String,
-  comment: Schema.String,
-});
-
 const DeleteCommandRequest = Schema.Struct({
   runtimeId: Schema.String,
   type: Schema.Literal('delete'),
@@ -70,7 +62,6 @@ const ClearCommandRequest = Schema.Struct({
 });
 
 export const BridgeCommandRequest = Schema.Union([
-  ReplyCommandRequest,
   DeleteCommandRequest,
   ClearCommandRequest,
 ]);
@@ -312,15 +303,8 @@ export class SnapshotStore {
     if (stored.pendingCommands.size >= this.#maxPendingCommands) {
       throw new CommandQueueError('QueueFull');
     }
-    const replyComment = request.type === 'reply' ? request.comment.trim() : undefined;
     if (
-      replyComment !== undefined &&
-      (replyComment.length === 0 || replyComment.length > MAX_AGENT_REPLY_LENGTH)
-    ) {
-      throw new CommandQueueError('InvalidCommand');
-    }
-    if (
-      request.type !== 'clear' &&
+      request.type === 'delete' &&
       !stored.snapshot.annotations.some(({ id }) => id === request.annotationId)
     ) {
       throw new CommandQueueError('AnnotationNotFound');
@@ -331,27 +315,19 @@ export class SnapshotStore {
       throw new CommandQueueError('DuplicateCommandId');
     }
     const command: AgentCommandValue =
-      request.type === 'reply'
+      request.type === 'delete'
         ? {
             id,
-            type: 'reply',
+            type: 'delete',
             annotationId: request.annotationId,
-            comment: request.comment.trim(),
             createdAt: now,
           }
-        : request.type === 'delete'
-          ? {
-              id,
-              type: 'delete',
-              annotationId: request.annotationId,
-              createdAt: now,
-            }
-          : {
-              id,
-              type: 'clear',
-              annotationIds: stored.snapshot.annotations.map(({ id }) => id),
-              createdAt: now,
-            };
+        : {
+            id,
+            type: 'clear',
+            annotationIds: stored.snapshot.annotations.map(({ id }) => id),
+            createdAt: now,
+          };
 
     let resolve!: (result: BridgeCommandResponse) => void;
     let reject!: (error: CommandQueueError) => void;
@@ -444,13 +420,7 @@ export class SnapshotStore {
     if (this.#retiredCommandIds.has(id)) return true;
     for (const stored of this.#snapshots.values()) {
       if (stored.pendingCommands.has(id)) return true;
-      if (
-        stored.snapshot.annotations.some(
-          (annotation) =>
-            annotation.id === id ||
-            annotation.replies?.some((reply) => reply.id === id) === true,
-        )
-      ) {
+      if (stored.snapshot.annotations.some((annotation) => annotation.id === id)) {
         return true;
       }
     }
@@ -516,22 +486,9 @@ const commandIsReflected = (
   command: AgentCommandValue,
   snapshot: AgentSnapshotValue,
 ): boolean => {
-  const annotation =
-    command.type === 'clear'
-      ? undefined
-      : snapshot.annotations.find(({ id }) => id === command.annotationId);
-  if (command.type === 'reply') {
-    return (
-      annotation?.replies?.some(
-        (reply) =>
-          reply.id === command.id &&
-          reply.author === 'agent' &&
-          reply.comment === command.comment &&
-          reply.createdAt === command.createdAt,
-      ) ?? false
-    );
+  if (command.type === 'delete') {
+    return !snapshot.annotations.some(({ id }) => id === command.annotationId);
   }
-  if (command.type === 'delete') return annotation === undefined;
   const remainingIds = new Set(snapshot.annotations.map(({ id }) => id));
   return command.annotationIds.every((id) => !remainingIds.has(id));
 };
@@ -541,18 +498,11 @@ const validateDecodedSnapshot = (snapshot: AgentSnapshotValue): AgentSnapshotVal
     throw new Error(`A snapshot may contain at most ${MAX_ANNOTATIONS} annotations`);
   }
   const annotationIds = new Set<string>();
-  const replyIds = new Set<string>();
   for (const annotation of snapshot.annotations) {
     if (annotationIds.has(annotation.id)) {
       throw new Error('A snapshot may not contain duplicate annotation IDs');
     }
     annotationIds.add(annotation.id);
-    for (const reply of annotation.replies ?? []) {
-      if (replyIds.has(reply.id)) {
-        throw new Error('A snapshot may not contain duplicate reply IDs');
-      }
-      replyIds.add(reply.id);
-    }
   }
   return snapshot;
 };

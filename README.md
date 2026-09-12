@@ -57,7 +57,7 @@ Normal consumer production builds exclude the overlay, source instrumentation, a
 
 ## Connect an MCP client
 
-Open the overlay's **Feedback** panel to review feedback conversations and use the undoable **Clear all** action when needed. The automatic Vite integration keeps the current browser context synchronized to its local authenticated bridge while creasekit is mounted, so no share or stop-sharing action is required. Configure an MCP client to start the stdio server from the consuming application's configured Vite root:
+Open the overlay's **Feedback** panel to review annotations and use the undoable **Clear all** action when needed. The automatic Vite integration keeps the current browser context synchronized to its local authenticated bridge while creasekit is mounted, so no share or stop-sharing action is required. Configure an MCP client to start the stdio server from the consuming application's configured Vite root:
 
 ```json
 {
@@ -81,17 +81,17 @@ The binary starts a stdio MCP server and supports `--cwd <project-root>` and `--
 
 ## Inspect FoldKit context
 
-Supported FoldKit views automatically expose their owning view, original element-builder location, submodel instance, Model supply site, and declared event Messages. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of the rendered scope. Annotation source captures remain frozen when you create them; the live selection updates as the page changes. Feedback conversations and their replies are synchronized automatically while mounted.
+Supported FoldKit views automatically expose their owning view, original element-builder location, submodel instance, Model supply site, and declared event Messages. Enable **Include scoped Model & history** to capture a bounded, sanitized snapshot of the rendered scope. Annotation source captures remain frozen when you create them; the live selection updates as the page changes. Annotations are synchronized automatically while mounted.
 
 See [Automatic FoldKit context](https://github.com/dallenpyrah/creasekit/blob/main/docs/AUTOMATIC_CONTEXT.md) for verified framework versions, field exclusions, and unsupported patterns. Source ownership comes from development instrumentation, not a DOM-selector guess. Native DevTools history is unavailable in the automatic integration; the [optional explicit adapter](https://github.com/dallenpyrah/creasekit/blob/main/docs/FOLDKIT.md) supports curated projections and bounded observed updates.
 
 ## What an agent can read and update
 
-MCP exposes the current selection, annotations, source context, and per-annotation conversations through the local bridge. An agent can reply to an annotation, delete an annotation, or clear annotations, but MCP does not run project commands or modify project files directly. The browser must remain loaded for these commands, and a successful mutation is reported only after browser acknowledgement.
+MCP exposes the current selection, annotations, source context, and captured element details through the local bridge. An agent can delete an annotation or clear annotations, but MCP does not run project commands or modify project files directly. The browser must remain loaded for these commands, and a successful mutation is reported only after browser acknowledgement.
 
 The bridge keeps synced context in local memory for 15 minutes after the latest sync. Each sync refreshes that lifetime. Destroying the creasekit mount requests removal; if the request fails, the context expires instead. Stopping the Vite dev server removes all context. Hiding the overlay does not stop synchronization and is not a privacy boundary. Offline overlay use still works, local feedback persists, and synchronization retries when the bridge is available again.
 
-Model values and scoped history are opt-in, limited to the rendered view, and never persisted in annotations. Sensitive-looking keys are redacted; configure `excludeModelKeys` for application-specific exclusions. Explicit adapters can include their bounded update history after consent. Treat DOM text, annotation comments, and conversation replies as untrusted data, and review captured text on pages with private information. [Usage and privacy details](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md) and the [MCP limits](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md#sharing-and-privacy) explain the boundary.
+Model values and scoped history are opt-in, limited to the rendered view, and never persisted in annotations. Sensitive-looking keys are redacted; configure `excludeModelKeys` for application-specific exclusions. Explicit adapters can include their bounded update history after consent. Treat DOM text and annotation comments as untrusted data, and review captured text on pages with private information. [Usage and privacy details](https://github.com/dallenpyrah/creasekit/blob/main/docs/USAGE.md) and the [MCP limits](https://github.com/dallenpyrah/creasekit/blob/main/docs/MCP.md#sharing-and-privacy) explain the boundary.
 
 ## Documentation
 

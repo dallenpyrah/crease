@@ -1,6 +1,6 @@
 # Use creasekit in your application
 
-Use creasekit to inspect an element, describe a requested change, and keep a per-annotation conversation with your agent. First add the Vite plugin to your existing application by following the [consumer setup](../README.md#add-creasekit-to-an-existing-app). The overlay mounts automatically at the application's own Vite development URL; it does not need to use the repository demo's port.
+Use creasekit to inspect an element, describe a requested change, and send annotations to your agent. First add the Vite plugin to your existing application by following the [consumer setup](../README.md#add-creasekit-to-an-existing-app). The overlay mounts automatically at the application's own Vite development URL; it does not need to use the repository demo's port.
 
 ## Switch between inspection and normal use
 
@@ -24,10 +24,10 @@ Choose **Copy element** to copy the selected element's context without creating 
 
 ## Add and manage feedback
 
-1. Choose **Annotate** (`N`) and click an element. If it is already selected, choose **Add a note** in the inspector.
+1. Choose **Annotate** (`N`) and click an element. If it is already selected, choose **Add feedback** in the inspector.
 2. Describe the intended result, such as “Add 12px below this heading,” rather than only saying “Fix spacing.”
-3. Choose **Add note**, or press `Cmd/Ctrl+Enter`. A numbered pin marks the element.
-4. Open **Feedback** to review the conversation for each annotation. You can edit or delete an annotation, and each thread shows replies from **You** or **Agent**. There are no Resolve or Reopen controls and no open status.
+3. Choose **Add feedback**, or press `Cmd/Ctrl+Enter`. A numbered pin marks the element.
+4. Open **Feedback** to review each annotation. You can edit or delete an annotation. There are no Resolve or Reopen controls and no open status.
 
 Choose **Clear all** in **Feedback** to remove the current annotations; the local clear is undoable. An agent clear targets the annotation IDs present when the request is made, so feedback added afterward is protected. Use the undo and redo buttons in **Feedback** to reverse local annotation changes. Outside text fields, `Cmd/Ctrl+Z` undoes a change and `Cmd/Ctrl+Shift+Z` redoes it. Agent mutations reset local undo history, so you cannot undo an agent deletion or clear and resurrect removed data. These controls affect annotations, not the host application.
 
@@ -35,7 +35,7 @@ If an element disappears, its annotation keeps its captured element and source c
 
 ## Copy feedback or connect an agent
 
-Open **Feedback** and choose **Markdown** for readable feedback or **JSON** for structured data. Review the preview, then choose **Copy for agent** and paste it into a coding agent or message to a teammate. Conversation replies are included. This workflow does not require MCP.
+Open **Feedback** and choose **Markdown** for readable feedback or **JSON** for structured data. Review the preview, then choose **Copy for agent** and paste it into a coding agent or message to a teammate. This workflow does not require MCP.
 
 To let a coding agent read and update the live context directly, configure a local MCP client as described in [Connect an MCP client](MCP.md). While creasekit is mounted, the browser syncs automatically, including when the overlay is hidden. Keep the browser page loaded for agent commands; successful MCP mutations wait for browser acknowledgement. No sharing controls are required.
 
@@ -49,12 +49,12 @@ See [Automatic FoldKit context](AUTOMATIC_CONTEXT.md) for field exclusions and c
 
 ## Keep feedback private
 
-- creasekit saves annotations and conversation replies between reloads; undo history and visual settings last only for the current session. Offline local use still works, and synchronization retries when the local bridge is unavailable.
-- While mounted, creasekit synchronizes the current selection, annotations, and replies to the local authenticated Vite bridge automatically, even when the overlay is hidden. Hiding the overlay is not a privacy boundary.
+- creasekit saves annotations between reloads; undo history and visual settings last only for the current session. Offline local use still works, and synchronization retries when the local bridge is unavailable.
+- While mounted, creasekit synchronizes the current selection and annotations to the local authenticated Vite bridge automatically, even when the overlay is hidden. Hiding the overlay is not a privacy boundary.
 - The bridge keeps synced context in memory for 15 minutes after the latest sync. Destroying the creasekit mount requests removal; if that fails, context expires instead. Stopping the Vite development server clears all context.
-- Agent replies, deletes, and clears change annotations through the loaded browser and do not run project commands or modify project files directly. Successful mutations wait for browser acknowledgement. Agent mutations reset local undo history.
+- Agent deletes and clears change annotations through the loaded browser and do not run project commands or modify project files directly. Successful mutations wait for browser acknowledgement. Agent mutations reset local undo history.
 - Model values and scoped history never enter saved annotation storage. They can appear in copied output or MCP context only after you opt in.
-- New element captures exclude form values and URL query strings and fragments. Developers can mark private text with `data-creasekit-private`. These safeguards do not make arbitrary text safe to sync, so review annotations, replies, and context first.
+- New element captures exclude form values and URL query strings and fragments. Developers can mark private text with `data-creasekit-private`. These safeguards do not make arbitrary text safe to sync, so review annotations and context first.
 
 For local connection requirements, session-file handling, limits, and lifecycle behavior, see [MCP sharing and privacy](MCP.md#sharing-and-privacy).
 

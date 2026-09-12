@@ -4,7 +4,6 @@ import { defineMessageUnion } from 'foldkit/message';
 import {
   type Annotation,
   AnnotationArray,
-  type AnnotationReply,
   Annotation as AnnotationSchema,
   AnnotationStatus,
 } from './domain.js';
@@ -111,31 +110,6 @@ export const remove = (model: Model, id: string): Update => {
   return mutate(
     model,
     model.annotations.filter((annotation) => annotation.id !== id),
-  );
-};
-
-export const reply = (model: Model, id: string, reply: AnnotationReply): Update => {
-  const current = model.annotations.find((annotation) => annotation.id === id);
-  if (
-    current === undefined ||
-    reply.comment.trim().length === 0 ||
-    current.replies?.some((message) => message.id === reply.id)
-  )
-    return unchanged(model);
-  return mutate(
-    model,
-    model.annotations.map((annotation) =>
-      annotation.id === id
-        ? {
-            ...annotation,
-            updatedAt: Math.max(annotation.updatedAt, reply.createdAt),
-            replies: [
-              ...(annotation.replies ?? []),
-              { ...reply, comment: reply.comment.trim() },
-            ],
-          }
-        : annotation,
-    ),
   );
 };
 

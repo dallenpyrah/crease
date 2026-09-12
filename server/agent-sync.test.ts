@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AgentSnapshot } from '../src/agent-contract';
 import {
   CommandQueueError,
   SnapshotStore,
@@ -54,36 +53,22 @@ describe('automatic agent sync state', () => {
     });
   });
 
-  it('only completes a reply when the acknowledging snapshot contains that reply', async () => {
-    const store = new SnapshotStore({ createCommandId: () => 'command-reply' });
-    const snapshot = snapshotFixture('reply');
+  it('only completes a delete when the acknowledgement removes its target', async () => {
+    const store = new SnapshotStore({ createCommandId: () => 'command-delete-target' });
+    const deleted = annotationFixture('deleted');
+    const remaining = annotationFixture('remaining');
+    const snapshot = snapshotFixture('delete-reflection', [deleted, remaining]);
     store.sync({ snapshot, acknowledgedCommandIds: [] });
-    const annotation = snapshot.annotations[0];
-    if (annotation === undefined) throw new Error('Fixture annotation is missing');
     const queued = store.queueCommand({
       runtimeId: snapshot.runtimeId,
-      type: 'reply',
-      annotationId: annotation.id,
-      comment: '  Implemented in the agent  ',
+      type: 'delete',
+      annotationId: deleted.id,
     });
     const command = queued.command;
-    if (command.type !== 'reply') throw new Error('Expected a reply command');
-    expect(command.comment).toBe('Implemented in the agent');
-    const appliedSnapshot: AgentSnapshot = {
+    if (command.type !== 'delete') throw new Error('Expected a delete command');
+    const appliedSnapshot = {
       ...snapshot,
-      annotations: [
-        {
-          ...annotation,
-          replies: [
-            {
-              id: command.id,
-              author: 'agent',
-              comment: command.comment,
-              createdAt: command.createdAt,
-            },
-          ],
-        },
-      ],
+      annotations: [remaining],
     };
 
     store.sync({
@@ -96,21 +81,21 @@ describe('automatic agent sync state', () => {
     });
   });
 
-  it('fails rather than claiming a reply applied after its thread was deleted', async () => {
-    const store = new SnapshotStore({ createCommandId: () => 'orphaned-reply' });
-    const snapshot = snapshotFixture('reply-race');
+  it('fails rather than claiming a clear applied while a queued annotation remains', async () => {
+    const store = new SnapshotStore({ createCommandId: () => 'incomplete-clear' });
+    const first = annotationFixture('first');
+    const remaining = annotationFixture('remaining');
+    const snapshot = snapshotFixture('clear-race', [first, remaining]);
     store.sync({ snapshot, acknowledgedCommandIds: [] });
     const queued = store.queueCommand({
       runtimeId: snapshot.runtimeId,
-      type: 'reply',
-      annotationId: snapshot.annotations[0]?.id ?? '',
-      comment: 'This must not report success',
+      type: 'clear',
     });
     const completion = queued.completion.catch((error: unknown) => error);
 
     expect(
       store.sync({
-        snapshot: { ...snapshot, annotations: [] },
+        snapshot: { ...snapshot, annotations: [remaining] },
         acknowledgedCommandIds: [queued.command.id],
       }),
     ).toEqual({ commands: [] });
@@ -199,19 +184,6 @@ describe('automatic agent sync state', () => {
         type: 'clear',
       }),
     ).toThrowError(CommandQueueError);
-
-    const validationStore = new SnapshotStore();
-    validationStore.sync({ snapshot, acknowledgedCommandIds: [] });
-    for (const comment of ['   ', 'x'.repeat(4_001)]) {
-      expect(() =>
-        validationStore.queueCommand({
-          runtimeId: snapshot.runtimeId,
-          type: 'reply',
-          annotationId: snapshot.annotations[0]?.id ?? '',
-          comment,
-        }),
-      ).toThrowError(CommandQueueError);
-    }
   });
 
   it('removes expired, unshared, and cleared commands before later delivery', async () => {

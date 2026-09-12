@@ -35,7 +35,7 @@ type FeatureIcon =
   | 'undo'
   | 'persist'
   | 'context'
-  | 'conversation'
+  | 'clear'
   | 'settings';
 
 type Feature = Readonly<{
@@ -151,10 +151,9 @@ const featureIcon = (h: HtmlBuilder<Message>, name: FeatureIcon) => {
       ]);
     case 'context':
       return h.svg(attributes, [h.path([h.D('M6 3 2.5 8 6 13M10 3l3.5 5-3.5 5')])]);
-    case 'conversation':
+    case 'clear':
       return h.svg(attributes, [
-        h.path([h.D('M2 2h12v9H7l-4 3v-3H2V2Z')]),
-        h.path([h.D('M5 5h6M5 8h4')]),
+        h.path([h.D('M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10M7 7v4m2-4v4')]),
       ]);
     case 'settings':
       return h.svg(attributes, [
@@ -217,7 +216,7 @@ const features: ReadonlyArray<Feature> = [
   {
     icon: 'annotation',
     name: 'Text annotations',
-    description: 'Start conversations on elements',
+    description: 'Annotate elements for your agent',
   },
   {
     icon: 'pin',
@@ -240,10 +239,10 @@ const features: ReadonlyArray<Feature> = [
     description: 'Sync feedback automatically with your local agent',
   },
   {
-    icon: 'conversation',
-    name: 'Conversations',
+    icon: 'clear',
+    name: 'Clear annotations',
     description:
-      'Exchange replies with your agent, then clear feedback for the next iteration',
+      'Clear feedback for the next iteration, yourself or through your agent',
   },
   {
     icon: 'settings',
@@ -630,7 +629,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.p(
                         [classAttr(h, css(styles.stepText))],
                         [
-                          'Annotate an element, then continue the conversation in Feedback. Your local agent can read it, reply, and clear annotations without a sharing step.',
+                          'Annotate an element and review it in Feedback. Your local agent can read and clear annotations without a sharing step.',
                         ],
                       ),
                     ],
@@ -655,7 +654,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
                       h.p(
                         [classAttr(h, css(styles.stepNote))],
                         [
-                          'The --cwd directory contains .creasekit/mcp-session.json. Feedback syncs automatically while the page is loaded. Ask your agent to read it, reply in the conversations, and clear annotations after addressing them.',
+                          'The --cwd directory contains .creasekit/mcp-session.json. Feedback syncs automatically while the page is loaded. Ask your agent to read it and clear annotations after addressing them.',
                         ],
                       ),
                     ],
